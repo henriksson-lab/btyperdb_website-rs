@@ -1,7 +1,13 @@
+use std::io::Cursor;
+
 use anyhow::Result;
-use my_web_app::MyTestStruct;
+
+use my_web_app::StrainTableEntries;
+use my_web_app::SearchSettings;
+use my_web_app::SearchCriteria;
+
 use yew::{
-    format::{Json, Nothing, Text},
+    format::{Json, Nothing},
     prelude::*,
     services::{
         fetch::{FetchTask, Request, Response},
@@ -9,6 +15,9 @@ use yew::{
     },
 };
 
+
+////////////////////////////////////////////////////////////
+/// x
 #[derive(Debug)]
 #[derive(PartialEq)]
 enum CurrentPage {
@@ -19,38 +28,60 @@ enum CurrentPage {
     About,
 }
 
-
+////////////////////////////////////////////////////////////
+/// x
 #[derive(Debug)]
 enum Msg {
 
     OpenPage(CurrentPage),
-
-/* 
-    SetText(Option<String>),
-    SetStruct(Option<MyTestStruct>),*/
+    StartQuery,
+    SetQuery(Option<StrainTableEntries>),
+    SetSearchControlVisibility(bool),
+    AddSearchFilter,
+    DeleteSearchFilter(usize),
 }
 
+////////////////////////////////////////////////////////////
+/// x
 struct Model {
     link: ComponentLink<Self>,
     current_page: CurrentPage,
-    /* 
-    value: i64,
-    text: Option<String>,
-    task: Option<FetchTask>,
-    obj: Option<MyTestStruct>,*/
+    tabledata: Option<StrainTableEntries>,
+    tabledata_from: usize,
+    task: Option<FetchTask>, ///////////// why do we keep this?
+    show_search_controls: bool,
+    search_settings: SearchSettings,
 }
+
 impl Component for Model {
     type Message = Msg;
 
     type Properties = ();
 
+    ////////////////////////////////////////////////////////////
+    /// x
     fn create(_props: Self::Properties, link: ComponentLink<Self>) -> Self {
+
+
+
+        // Read the JSON contents of the file as an instance of `User`.
+        let tabledata:StrainTableEntries = serde_json::from_reader(Cursor::new(include_bytes!("testdata.json"))).unwrap();
+
+
+
         Self {
             link,
             current_page: CurrentPage::Home,
+            tabledata: Some(tabledata), //None,
+            tabledata_from: 0,
+            task: None,
+            show_search_controls: true,
+            search_settings: SearchSettings::new()
         }
     }
 
+    ////////////////////////////////////////////////////////////
+    /// x
     fn update(&mut self, msg: Self::Message) -> ShouldRender {
         match msg {
 
@@ -59,58 +90,68 @@ impl Component for Model {
                 true
             }
 
-            /*
-            
-            Msg::SetStruct(data) => {
-                log::trace!("Update: {:?}", data);
-                self.obj = data;
-                true
-            }
 
-
-            Msg::Fetch => {
-                let request = Request::get("/hello")
-                    .body(Nothing)
-                    .expect("Could not build request");
-                let callback = self
-                    .link
-                    .callback(|response: Response<Text>| Msg::SetText(response.into_body().ok()));
-                let task = FetchService::fetch(request, callback).expect("Failed to start request");
-                self.task = Some(task);
-                false
-            }
-            Msg::FetchStruct => {
-                let request = Request::get("/json-data")
+            Msg::StartQuery => {
+                let request = Request::get("/straindata")
                     .body(Nothing)
                     .expect("Could not build request");
                 let callback =
                     self.link
-                        .callback(|response: Response<Json<Result<MyTestStruct>>>| {
+                        .callback(|response: Response<Json<Result<StrainTableEntries>>>| {
                             log::debug!("{:?}", response);
                             let Json(data) = response.into_body();
-                            Msg::SetStruct(data.ok())
+                            Msg::SetQuery(data.ok())
                         });
                 let task = FetchService::fetch(request, callback).expect("Failed to start request");
                 self.task = Some(task);
                 false
             }
 
- */
+
+            Msg::SetQuery(data) => {
+                //log::trace!("SetQuery: {:?}", data);
+                self.tabledata = data;
+                self.tabledata_from = 0;
+                true
+            }
+
+            Msg::SetSearchControlVisibility(data) => {
+                //log::trace!("SetSearchControlVisibility: {:?}", data);
+                self.show_search_controls = data;
+                true
+            }
+
+            Msg::AddSearchFilter => {
+                //log::trace!("AddSearchFilter: {:?}", data);
+                let c = SearchCriteria::new();
+                self.search_settings.criteria.push(c);
+                true
+            },
+
+            Msg::DeleteSearchFilter(i) => {
+                //log::trace!("DeleteSearchFilter: {:?}", data);
+                self.search_settings.criteria.remove(i);
+                true
+            }
+
+
             
+
 
         }
     }
 
+
+    ////////////////////////////////////////////////////////////
+    /// x
     fn change(&mut self, _props: Self::Properties) -> ShouldRender {
         false
     }
 
 
-    
 
-
-
-
+    ////////////////////////////////////////////////////////////
+    /// x
     fn view(&self) -> Html {
 
         let current_page = match self.current_page { 
@@ -121,32 +162,32 @@ impl Component for Model {
             CurrentPage::About => self.view_about_pane()
         };
 
-        
+        let html_top_buttons = html! {
+            <header class="App-header">
+                <div id="topmenu" class="topnav">
+                    <div class="topnav-right">
+                        <a class=active_if(self.current_page==CurrentPage::Home)       onclick=self.link.callback(|_| Msg::OpenPage(CurrentPage::Home))>{"Home"}</a>
+                        <a class=active_if(self.current_page==CurrentPage::Search)     onclick=self.link.callback(|_| Msg::OpenPage(CurrentPage::Search))>{"Search"}</a>
+                        <a class=active_if(self.current_page==CurrentPage::Statistics) onclick=self.link.callback(|_| Msg::OpenPage(CurrentPage::Statistics))>{"Statistics"}</a>
+                        <a class=active_if(self.current_page==CurrentPage::Help)       onclick=self.link.callback(|_| Msg::OpenPage(CurrentPage::Help))>{"Help"}</a>
+                        <a class=active_if(self.current_page==CurrentPage::About)      onclick=self.link.callback(|_| Msg::OpenPage(CurrentPage::About))>{"About"}</a>
+                    </div>
+                </div>
+            </header>        
+        };
 
         html! {
             <div>
-
-                <header class="App-header">
-                    <div id="topmenu" class="topnav">
-                        <div class="topnav-right">
-                            <a class=active_if(self.current_page==CurrentPage::Home)       onclick=self.link.callback(|_| Msg::OpenPage(CurrentPage::Home))>{"Home"}</a>
-                            <a class=active_if(self.current_page==CurrentPage::Search)     onclick=self.link.callback(|_| Msg::OpenPage(CurrentPage::Search))>{"Search"}</a>
-                            <a class=active_if(self.current_page==CurrentPage::Statistics) onclick=self.link.callback(|_| Msg::OpenPage(CurrentPage::Statistics))>{"Statistics"}</a>
-                            <a class=active_if(self.current_page==CurrentPage::Help)       onclick=self.link.callback(|_| Msg::OpenPage(CurrentPage::Help))>{"Help"}</a>
-                            <a class=active_if(self.current_page==CurrentPage::About)      onclick=self.link.callback(|_| Msg::OpenPage(CurrentPage::About))>{"About"}</a>
-                        </div>
-                    </div>
-                </header>
-
+                { html_top_buttons }
                 { current_page }
-                //{ page_search }
-
             </div>
         }
     }
 }
 
 
+////////////////////////////////////////////////////////////
+/// If condition is met, return "active", otherwise "". For CSS styling of which control is active
 fn active_if(cond: bool) -> String {
     if cond {
         "active".to_string()
@@ -156,14 +197,19 @@ fn active_if(cond: bool) -> String {
 }
 
 
+
+
 impl Model {
 
+    ////////////////////////////////////////////////////////////
+    /// x
+    fn view_search_line(&self, i: usize) -> Html {
 
 
-    fn view_search_line(&self) -> Html {
+        let crit = self.search_settings.criteria.get(i).unwrap();
 
         html! {
-			<div class="divSearchField">
+			<div class="divSearchField" onclick=self.link.callback(move |_| Msg::DeleteSearchFilter(i))>
 				<button name="bDelete" class="buttonspacer">
                     {"X"}
                 </button>
@@ -172,9 +218,9 @@ impl Model {
 					<option value="NCBI_BioSample">{"NCBI_BioSample"}</option>
 				</select>
 				<label>
-                    {"&nbsp; From: "}
+                    {" From: "}
 					<input class="textbox" type="text" name="value" value="20000"/>
-                    {"&nbsp; To: "}
+                    {" To: "}
 					<input class="textbox" type="text" name="value2" value="1000000000"/>
 				</label>				
 			</div>
@@ -183,39 +229,56 @@ impl Model {
     }
 
 
+
+    ////////////////////////////////////////////////////////////
+    /// x
     fn view_search_pane(&self) -> Html {
+
+        let search_controls = html! {
+            <div>
+                <div class="withspacer"> /////////likely need to fix divs here
+                </div>
+                <div>
+                    {
+                        (0..self.search_settings.criteria.len()).into_iter().map(|i| { 
+                            html!{  self.view_search_line(i)  }
+                        }).collect::<Html>()
+                    }
+                    <div>                        
+                        <button class="buttonspacer" onclick=self.link.callback(|_| Msg::AddSearchFilter)>
+                            {"Add filter"}
+                        </button>
+                        <button class="buttonspacer" onclick=self.link.callback(|_| Msg::StartQuery)>
+                            {"Search"}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        };
+
+        let visibility=self.show_search_controls;
 
         html! {
             <div>
                 <div class="App-divider">
                     {"Search for genomes"}                
-                    <button class="toggleview">
-                        {"Hide panel"}                    
+                    <button class="toggleview" onclick=self.link.callback(move |_| Msg::SetSearchControlVisibility(!visibility))>
+                        { if self.show_search_controls { html!{"Hide panel"} } else { html!{"Show panel"} } }  
                     </button>
                 </div>
 
-                <div class="withspacer"> /////////likely need to fix divs here
-                </div>
-                <div>
-                    { self.view_search_line() }
-                    <div>
-                        
-                        <button class="buttonspacer">
-                            {"Add filter"}
-                        </button>
-                        <button class="buttonspacer">
-                            {"Search"}
-                        </button>
+                { if self.show_search_controls { search_controls } else { html!{""} } }  
 
-                    </div>
-                </div>
+                { self.view_table() }
+
             </div>
         }
         
     }
 
 
-
+    ////////////////////////////////////////////////////////////
+    /// x
     fn view_help_pane(&self) -> Html {
         html! {
             <div>
@@ -237,7 +300,8 @@ impl Model {
 
 
 
-
+    ////////////////////////////////////////////////////////////
+    /// x
     fn view_statistics_pane(&self) -> Html {
 
         html! {
@@ -252,7 +316,7 @@ impl Model {
                     {"Human illness"}
                     {"BTyper3 adjusted panC group"}
                 </p>
-                {"&nbsp;"}
+                {""}
                 
             </div>
             <br />
@@ -263,7 +327,8 @@ impl Model {
 
 
 
-
+    ////////////////////////////////////////////////////////////
+    /// x
     fn view_about_pane(&self) -> Html {
 
         html! {
@@ -378,6 +443,9 @@ impl Model {
     }
 
 
+
+    ////////////////////////////////////////////////////////////
+    /// x
     fn view_landing_page(&self) -> Html {
 
         html! {
@@ -403,6 +471,101 @@ impl Model {
 
             </div>
         }
+    }
+
+
+
+    ////////////////////////////////////////////////////////////
+    /// x
+    fn view_table_row(&self, row: &Vec<String>) -> Html {
+
+        //pub column_names: Vec<String>,
+        let btyper_id = row.get(0).expect("Could not get first column of row to use as id");
+
+        html! {
+            <tr key={btyper_id.clone()}>
+                {
+                    row.clone().iter().enumerate().map(|(i, val)| {  /////////////////////////////////////////////// check why so much cloning needed
+                        html!{<td key={i}>{ val.clone() }</td>}
+                    }).collect::<Html>()
+                }
+            </tr>
+        }        
+    }
+
+
+    ////////////////////////////////////////////////////////////
+    /// x
+    fn view_table(&self) -> Html {
+
+        if let Some(dt) = &self.tabledata {
+
+            if dt.rows.len()==0 {
+
+                html! {"table has no data"}
+
+            } else {
+
+                let html_header = html! {
+                    <tr>
+                        {
+                            dt.columns.clone().into_iter().map(|name| { /////////////////////////////////////////////// check why so much cloning needed
+                                html!{<th key={name.clone()}>{ name.clone() }</th>}
+                            }).collect::<Html>()
+                        }
+                    </tr>
+                };
+
+                let entries_per_page = 100;
+
+                let from_row = 0;
+                let mut to_row = from_row + entries_per_page;
+                if to_row > dt.rows.len() {
+                    to_row = dt.rows.len();
+                }
+
+                let show_rows = from_row..to_row;
+
+                log::debug!("showrows {:?}", show_rows);
+
+                //// Generate all pages
+                let possible_pages = 0..(1+(dt.rows.len()/entries_per_page));
+                let div_gotopage = html! {
+                    <div>
+                        {"Show page: "}
+                        {
+                            possible_pages.into_iter().map(|p| 
+                                html!{ format!("{} ",p+1)}
+                            ).collect::<Html>()
+                        }
+                    </div>
+                };
+
+
+                html! {
+                    <div>
+                        { div_gotopage }
+                        <table class="divtable2">
+                            ///// The table header
+                            { html_header }
+                            ///// All rows in the table
+                            {
+                                show_rows.into_iter().map(|i| { 
+                                    html!{  self.view_table_row(&dt.rows.get(i).expect("could not find row"))  }
+                                }).collect::<Html>()
+                            }
+                        </table>
+                    </div>        
+                } 
+            }
+           
+
+        } else {
+
+            html! {"dt = null"}
+
+        }
+        
     }
 
 }

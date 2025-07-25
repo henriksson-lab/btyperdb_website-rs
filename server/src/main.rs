@@ -19,42 +19,16 @@ extern crate rusqlite;
 
 use rusqlite::{Connection, Result};
 
+////////////////////////////////////////////////////////////
+/// x
 pub struct ServerData {
-//    num: i32,
     conn: Connection,
     strain_columns: StrainColumns
 }
 
 
-/*
-#[get("/hello")]
-async fn hello() -> impl Responder {
-    info!("Sending a String.");
-    "Hallo Welt"
-}
-*/
-
-
-
-/*
-#[get("/json-data")]
-async fn jsondata(counter: Data<Mutex<ServerData>>) -> impl Responder {
-    let mut v = counter.lock().unwrap();
-//    *v.num += 1;
-
-    v.num += 1;
-
-//    let data = MyTestStruct::from(*v.num);
-    let data = MyTestStruct::from(v.num);
-    info!("Data: {:?}", data);
-//    info!("Sending: {:?}", counter.num);
-    serde_json::to_string(&data)
-}
- */
-
-
-
-
+////////////////////////////////////////////////////////////
+/// x
 #[get("/straindata")]
 async fn straindata(server_data: Data<Mutex<ServerData>>) -> impl Responder {
     let data = sql(&server_data).expect("could not read database");
@@ -63,7 +37,8 @@ async fn straindata(server_data: Data<Mutex<ServerData>>) -> impl Responder {
 }
 
 
-
+////////////////////////////////////////////////////////////
+/// x
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     env_logger::init();
@@ -110,13 +85,8 @@ async fn main() -> std::io::Result<()> {
 
 
 
-
-
-
-
-
-
-
+////////////////////////////////////////////////////////////
+/// x
 pub fn read_btyper_database_include (
     src: impl Read
 ) -> StrainColumns { 
@@ -139,21 +109,13 @@ pub fn read_btyper_database_include (
 
 
 
-
-
-
-
-
-
-
-
-
-
+////////////////////////////////////////////////////////////
+/// x
 fn sql(server_data: &Data<Mutex<ServerData>>) -> Result<StrainTableEntries> {
 
     let server_data =server_data.lock().unwrap();
 
-    let mut stmt = server_data.conn.prepare("SELECT * FROM straindata limit 5")?;
+    let mut stmt = server_data.conn.prepare("SELECT * FROM straindata limit 50000")?;
 
     let cn = stmt.column_names().iter().map(|x| x.to_string()).collect();
     let numcol = stmt.column_count();
