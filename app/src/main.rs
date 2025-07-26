@@ -2,6 +2,7 @@ use std::io::Cursor;
 
 use anyhow::Result;
 
+use my_web_app::ComparisonType;
 use my_web_app::DatabaseMetadata;
 use my_web_app::TableData;
 use my_web_app::SearchSettings;
@@ -46,6 +47,9 @@ enum Msg {
     ChangedSearchFieldType(usize, ChangeData),
     ChangedSearchFieldFrom(usize, String),
     ChangedSearchFieldTo(usize, String),
+    ChangedSearchFieldLike(usize, String),
+
+    SetTableFrom(usize),
 }
 
 ////////////////////////////////////////////////////////////
@@ -58,7 +62,7 @@ struct Model {
     task: Option<FetchTask>, ///////////// why do we keep this?
     show_search_controls: bool,
     search_settings: SearchSettings,
-    db_metadata: Option<DatabaseMetadata>
+    db_metadata: Option<DatabaseMetadata>,
 }
 
 impl Component for Model {
@@ -85,7 +89,7 @@ impl Component for Model {
             task: None,
             show_search_controls: true,
             search_settings: SearchSettings::new(),
-            db_metadata: None
+            db_metadata: None,
         };
 
         //Get metadata about database right away
@@ -108,7 +112,7 @@ impl Component for Model {
             Msg::StartQuery => {
                 let json = serde_json::to_string(&self.search_settings).expect("Failed to generate json");
 
-                log::debug!("sending {}", json);
+                //log::debug!("sending {}", json);
 
                 //let request = Request::get("/straindata") /////////// do post instead
                 let request = Request::post("/straindata")
@@ -190,11 +194,8 @@ impl Component for Model {
                     //log::trace!("AddSearchFilter: {:?}", data);
                     let mut c = SearchCriteria::new();
                     c.field=col.column_id.clone();
-                    c.from=col.default_v1.clone();
-                    c.to=col.default_v2.clone();
-
+                    c.comparison = ComparisonType::default_comparison(&col);
                     self.search_settings.criteria.push(c);
-
                 }
                 true
             },
@@ -215,15 +216,10 @@ impl Component for Model {
                     //log::debug!("set field {:?}", field);
 
                     if let Some(db_metadata) = &self.db_metadata {
-
                         let column_metadata = db_metadata.columns.get(&crit.field).expect("no column");
-
-                        log::debug!("field info {:?} {:?}", crit.field, column_metadata);                        
-
-                        crit.from=column_metadata.default_v1.clone();
-                        crit.to=column_metadata.default_v2.clone();
-
-                        log::debug!("ChangedSearchFieldType: {:?}", crit);
+                        //log::debug!("field info {:?} {:?}", crit.field, column_metadata);                        
+                        crit.comparison = ComparisonType::default_comparison(column_metadata);
+                        //log::debug!("ChangedSearchFieldType: {:?}", crit);
                     }
 
 
@@ -235,16 +231,37 @@ impl Component for Model {
 
             Msg::ChangedSearchFieldFrom(i, val) => {
                 let field = self.search_settings.criteria.get_mut(i).expect("Could not get field");
-                field.from = val;
+                if let ComparisonType::FromTo(from,_to) = &mut field.comparison {
+                    *from = val;
+                }
                 //log::debug!("got f {:?}", field);
                 false
             }
             
             Msg::ChangedSearchFieldTo(i, val) => {
                 let field = self.search_settings.criteria.get_mut(i).expect("Could not get field");
-                field.to = val;
+                if let ComparisonType::FromTo(_from,to) = &mut field.comparison {
+                    *to = val;
+                }
                 //log::debug!("got f {:?}", field);
                 false
+            }
+
+            Msg::ChangedSearchFieldLike(i, val) => {
+                let field = self.search_settings.criteria.get_mut(i).expect("Could not get field");
+                if let ComparisonType::Like(v) = &mut field.comparison {
+                    *v = val;
+                }
+//                field.to = val;
+                //log::debug!("got f {:?}", field);
+                false
+            }
+
+
+
+            Msg::SetTableFrom(from) => {
+                self.tabledata_from = from;
+                true
             }
 
 
@@ -342,30 +359,38 @@ impl Model {
         let oninput_to = self.link.callback(move |e: InputData | {
             Msg::ChangedSearchFieldTo(i, e.value)
         });
+        let oninput_like = self.link.callback(move |e: InputData | {
+            Msg::ChangedSearchFieldLike(i, e.value)
+        });
         
         //log::debug!("render {:?}",crit);
 
 
-        let coltype = metadata.columns.get(&crit.field.clone()).unwrap().column_type.clone();
-        let is_ranged_type = coltype=="integer" || coltype=="float";
+        //let coltype = metadata.columns.get(&crit.field.clone()).unwrap().column_type.clone();
+        //let is_ranged_type = coltype=="integer" || coltype=="float";
         //possible values: text  integer float   
 
-        let html_values = if is_ranged_type {
-            html! {
-                <label>
-                    {" From: "}
-                    <input class="textbox" type="text" name="value1" value={crit.from.clone()} oninput={oninput_from}/> 
-                    {" To: "}
-                    <input class="textbox" type="text" name="value2" value={crit.to.clone()} oninput={oninput_to}/>
-                </label>				
+        let html_values = match &crit.comparison {
+            ComparisonType::FromTo(from,to) => {
+                html! {
+                    <label>
+                        {" From: "}
+                        <input class="textbox" type="text" name="value1" value={from.clone()} oninput={oninput_from}/> 
+                        {" To: "}
+                        <input class="textbox" type="text" name="value2" value={to.clone()} oninput={oninput_to}/>
+                    </label>				
+                }
+            },
+            ComparisonType::Like(v) => {
+                html! {
+                    <label>
+                        {" Is: "}
+                        <input class="textbox" type="text" name="value" value={v.clone()} oninput={oninput_like}/> 
+                    </label>				
+                }
             }
-        } else {
-            html! {
-                <label>
-                    {" Is: "}
-                    <input class="textbox" type="text" name="value" value={crit.from.clone()} oninput={oninput_from}/> 
-                </label>				
-            }
+
+            
         };
 
 
@@ -700,7 +725,7 @@ impl Model {
 
                 let entries_per_page = 100;
 
-                let from_row = 0;
+                let from_row = self.tabledata_from;
                 let mut to_row = from_row + entries_per_page;
                 if to_row > dt.rows.len() {
                     to_row = dt.rows.len();
@@ -708,20 +733,36 @@ impl Model {
 
                 let show_rows = from_row..to_row;
 
-                log::debug!("showrows {:?}", show_rows);
-
+                //log::debug!("showrows {:?}", show_rows);
                 //// Generate all pages
                 let possible_pages = 0..(1+(dt.rows.len()/entries_per_page));
-                let div_gotopage = html! {
-                    <div>
-                        {"Show page: "}
-                        {
-                            possible_pages.into_iter().map(|p| 
-                                html!{ format!("{} ",p+1)}
-                            ).collect::<Html>()
-                        }
-                    </div>
+                let div_gotopage = if possible_pages.len()>1 { 
+
+                    html! {
+                        <div>
+                            {"Go to page: "}
+                            {
+                                possible_pages.into_iter().map(move |p| {
+                                    
+                                    let onclick = self.link.callback(move |_e | {
+                                        Msg::SetTableFrom(p*entries_per_page)
+                                    });
+
+                                    html! { 
+                                        <label onclick={onclick}> 
+                                            {format!("{} ",p+1)}   /////// possible to highlight current page here
+                                        </label>
+                                    }
+                                }).collect::<Html>()
+                            }
+                        </div>
+                    }
+
+                } else {
+                    html!{ {""}}
                 };
+
+
 
 
                 html! {

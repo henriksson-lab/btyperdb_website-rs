@@ -4,6 +4,7 @@ use std::collections::BTreeMap;
 
 
 use actix_files::Files;
+use actix_web::web::Json;
 use actix_web::{get, post, web, web::Data, App, HttpResponse, HttpServer, Responder};
 use log::info;
 
@@ -43,10 +44,12 @@ async fn straindata(server_data: Data<Mutex<ServerData>>, req_body: web::Json<Se
 
     println!("{:?}",req_body); 
 
+    let Json(search_settings) = req_body;
+
 //    let search: SearchSettings = serde_json::from_str(req_body.as_str()).expect("Failed to parse search settings");
 //    println!("{:?}",search);
 
-    let data = query_straintable(&server_data).expect("could not read database");
+    let data = query_straintable(&server_data, search_settings).expect("could not read database");
     info!("Data: {:?}", data);
     serde_json::to_string(&data)
 }
@@ -64,6 +67,43 @@ async fn strainmeta(server_data: Data<Mutex<ServerData>>) -> impl Responder {
 
 
 
+pub fn sql_stringarg_to_num(s: &String) -> String {
+    if s.parse::<f64>().is_ok() {
+        s.clone()
+    } else {
+        panic!("bad value")
+    }
+}
+
+pub fn sql_stringarg_escape(s: &String) -> String {
+    let mut out =String::new();
+    for c in s.chars() {
+        if c.is_ascii_alphanumeric() || c.is_whitespace() || c=='-' || c=='_' || c=='.' || c==',' {
+            out.push(c);
+        } else {
+            println!("!!!!!!!!!!! unhandled char {}",c);
+        }
+    }
+    out
+}
+
+
+pub fn sql_check_name(s: &String) -> String {
+    if s.len()==0 {
+        panic!("invalid name as it is empty");
+    }
+
+    let valid_char="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVQXYZ0123456789_".as_bytes();
+    for b in s.as_bytes() {
+        if !valid_char.contains(b) {
+            panic!("invalid character in name {}", b);
+        }
+    }
+    s.clone()
+}
+
+
+
 
 pub fn build_straindb_search(search: &SearchSettings) -> String {
 
@@ -71,35 +111,30 @@ pub fn build_straindb_search(search: &SearchSettings) -> String {
 
     query.push_str(" FROM straindata ");
 
+    //let mut list_params:Vec<String> = Vec::new();
+    //https://docs.rs/rusqlite/latest/rusqlite/struct.Statement.html
+    //?1 ?2 etc
 
     if search.criteria.len()>0 {
         query.push_str(" WHERE ");
+
         let mut list_formatted_crit:Vec<String> = Vec::new();
         for crit in search.criteria.iter() {
-
-
-            let cmp = ComparisonType::FromTo;
-            let cmp = ComparisonType::Like;
-
-            match cmp {
-                ComparisonType::FromTo => {
-                   list_formatted_crit.push(format!("{} > {}",crit.field.clone(), crit.from.clone()));
-                   list_formatted_crit.push(format!("{} < {}",crit.field.clone(), crit.to.clone()));
+            match &crit.comparison {
+                ComparisonType::FromTo(from,to) => {
+                    list_formatted_crit.push(format!("{} > {}",sql_check_name(&crit.field), sql_stringarg_to_num(&from))); /////////// can we produce a list of {} prep statement?
+                    list_formatted_crit.push(format!("{} < {}",sql_check_name(&crit.field), sql_stringarg_to_num(&to)));
                 },
-                ComparisonType::Like => {
-                   list_formatted_crit.push(format!("{} LIKE {}",crit.field.clone(), crit.from.clone()));
+                ComparisonType::Like(v) => {
+                   list_formatted_crit.push(format!("{} LIKE \"{}\"",sql_check_name(&crit.field), sql_stringarg_escape(&v)));
                 }
             };
-            list_formatted_crit.push("".to_string());
         }
+        //println!("{:?}",query);
         query.push_str(list_formatted_crit.join(" AND ").as_str());
     }
-
-
     query.push_str(" limit 6000");
-
     query
-//    "SELECT * FROM straindata limit 6000"
 }
 
 ////////////////////////////////////////////////////////////
@@ -118,13 +153,14 @@ async fn main() -> std::io::Result<()> {
         &conn
     );
 
-    
+    /* 
     let ser:SearchSettings = serde_json::from_reader(
         Cursor::new(include_bytes!("/Users/mahogny/Desktop/rust/2_actix-yew-template/app/src/testsearch.json"))
     ).expect("asdasd");
+
     let q = build_straindb_search(&ser);
     println!("search {:?}",ser);
-    println!("search {}",q);
+    println!("search {}",q);*/
 
     let data = Data::new(Mutex::new(
         ServerData {
@@ -187,13 +223,19 @@ pub fn read_database_metadata (
 ////////////////////////////////////////////////////////////
 /// Get entries from the strain table given search criteria
 fn query_straintable(
-    server_data: &Data<Mutex<ServerData>>
+    server_data: &Data<Mutex<ServerData>>,
+    search: SearchSettings
 ) -> Result<TableData> {
+
+    let q = build_straindb_search(&search);
+    println!("Query database using: {}",q);
 
     let server_data =server_data.lock().unwrap();
 
-    let mut stmt = server_data.conn.prepare("SELECT * FROM straindata limit 6000")?;
+    let mut stmt = server_data.conn.prepare(q.as_str())?;
+    //let mut stmt = server_data.conn.prepare("SELECT * FROM straindata limit 6000")?;
 
+    
     let cn = stmt.column_names().iter().map(|x| x.to_string()).collect();
     let numcol = stmt.column_count();
 
