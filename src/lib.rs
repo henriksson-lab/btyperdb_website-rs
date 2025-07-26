@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 ////////////////////////////////////////////////////////////
 /// Strain table data
 #[derive(Debug, Deserialize, Serialize)]
-pub struct StrainTableEntries {
+pub struct TableData {
     pub columns: Vec<String>,
     pub rows: Vec<Vec<String>>,
 }
@@ -13,16 +13,24 @@ pub struct StrainTableEntries {
 ////////////////////////////////////////////////////////////
 /// Metadata about strain columns
 #[derive(Debug, Deserialize, Serialize)]
-pub struct StrainColumns {
-    pub columns: Vec<DatabaseIncludeRow>
+pub struct DatabaseMetadata {
+    pub num_strain: i32,
+    pub columns: Vec<DatabaseColumn>
 }
-
+impl DatabaseMetadata {
+    pub fn new() -> DatabaseMetadata {
+        DatabaseMetadata {
+            num_strain: -1,
+            columns: vec![]
+        }
+    }
+}
 
 
 ////////////////////////////////////////////////////////////
 /// Metadata about one column in the database
-#[derive(Debug, Serialize, serde::Deserialize, Eq, PartialEq)]
-pub struct DatabaseIncludeRow {
+#[derive(Debug, Serialize, Deserialize, Eq, PartialEq, Clone)]
+pub struct DatabaseColumn {
     pub column_id: String,
     pub column_type: String,	
     pub default_v1: String,	

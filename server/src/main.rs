@@ -1,13 +1,13 @@
+use std::num::NonZero;
 use std::sync::Mutex;
 
 use actix_files::Files;
 use actix_web::{get, web, web::Data, App, HttpResponse, HttpServer, Responder};
 use log::info;
 
-//use my_web_app::MyTestStruct;
-use my_web_app::StrainTableEntries;
-use my_web_app::DatabaseIncludeRow;
-use my_web_app::StrainColumns;
+use my_web_app::TableData;
+use my_web_app::DatabaseColumn;
+use my_web_app::DatabaseMetadata;
 
 use rusqlite::types::ValueRef;
 
@@ -20,56 +20,64 @@ extern crate rusqlite;
 use rusqlite::{Connection, Result};
 
 ////////////////////////////////////////////////////////////
-/// x
+/// Backend state
 pub struct ServerData {
     conn: Connection,
-    strain_columns: StrainColumns
+    db_metadata: DatabaseMetadata,
 }
 
 
 ////////////////////////////////////////////////////////////
-/// x
+/// REST entry point
 #[get("/straindata")]
 async fn straindata(server_data: Data<Mutex<ServerData>>) -> impl Responder {
-    let data = sql(&server_data).expect("could not read database");
+    let data = query_straintable(&server_data).expect("could not read database");
     info!("Data: {:?}", data);
     serde_json::to_string(&data)
 }
 
 
+
 ////////////////////////////////////////////////////////////
-/// x
+/// REST entry point
+#[get("/strainmeta")]
+async fn strainmeta(server_data: Data<Mutex<ServerData>>) -> impl Responder {
+    let server_data =server_data.lock().unwrap();
+    info!("metadata: {:?}", &server_data.db_metadata);
+    serde_json::to_string(&server_data.db_metadata)
+}
+
+
+
+////////////////////////////////////////////////////////////
+/// Backend entry point
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     env_logger::init();
 
-    let strain_columns = read_btyper_database_include(
-            Cursor::new(include_bytes!("/Users/mahogny/Desktop/rust/2_actix-yew-template/minimal_testing/meta/btyperdb_include.tsv"))
-        );
-
-
     let path = "/Users/mahogny/Desktop/rust/2_actix-yew-template/minimal_testing/meta/data.sqlite";
     let conn = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY).expect("Could not open database");
 
-
+    let db_metadata = read_database_metadata(
+        Cursor::new(include_bytes!("/Users/mahogny/Desktop/rust/2_actix-yew-template/minimal_testing/meta/btyperdb_include.tsv")),
+        &conn
+    );
 
     let data = Data::new(Mutex::new(
         ServerData {
-            //num: 0,
             conn: conn,
-            strain_columns: strain_columns
+            db_metadata: db_metadata,
         }
     ));
 
 
-//    let table = sql();
-//    println!("{:?}", table);
 
     HttpServer::new(move || {
         App::new()
             .app_data(data.clone())
             //.service(hello)
             .service(straindata)
+            .service(strainmeta)
             .service(Files::new("/", "./dist/").index_file("index.html"))
             .default_service(
                 web::route().to(|| HttpResponse::Found().header("Location", "/").finish()),
@@ -86,10 +94,16 @@ async fn main() -> std::io::Result<()> {
 
 
 ////////////////////////////////////////////////////////////
-/// x
-pub fn read_btyper_database_include (
-    src: impl Read
-) -> StrainColumns { 
+/// Get metadata about the database
+pub fn read_database_metadata (
+    src: impl Read,
+    conn: &Connection
+) -> DatabaseMetadata { 
+
+
+    let num_strain = query_get_strain_count(&conn).expect("Could not get SQL strain count");
+
+    /////////// Other metadata from CSV-file
 
     let mut outlist = Vec::new();
 
@@ -97,12 +111,13 @@ pub fn read_btyper_database_include (
         .delimiter(b'\t')
         .from_reader(src);
     for result in reader.deserialize() {
-        let record: DatabaseIncludeRow = result.unwrap();
+        let record: DatabaseColumn = result.unwrap();
         outlist.push(record);
     }
 
-    StrainColumns {
-        columns: outlist
+    DatabaseMetadata {
+        columns: outlist,
+        num_strain: num_strain
     }
 }
 
@@ -110,8 +125,10 @@ pub fn read_btyper_database_include (
 
 
 ////////////////////////////////////////////////////////////
-/// x
-fn sql(server_data: &Data<Mutex<ServerData>>) -> Result<StrainTableEntries> {
+/// Get entries from the strain table given search criteria
+fn query_straintable(
+    server_data: &Data<Mutex<ServerData>>
+) -> Result<TableData> {
 
     let server_data =server_data.lock().unwrap();
 
@@ -152,8 +169,40 @@ fn sql(server_data: &Data<Mutex<ServerData>>) -> Result<StrainTableEntries> {
         }
     }
 
-    Ok(StrainTableEntries {
+    Ok(TableData {
         columns: cn,
         rows: ok_rows,
     })
+}
+
+
+
+
+
+
+
+
+
+
+////////////////////////////////////////////////////////////
+/// 
+pub fn query_get_strain_count(
+    conn: &Connection
+) -> Result<i32> {
+
+    let mut stmt = conn.prepare("SELECT count(*) as cnt FROM straindata")?;
+
+    let cnts = stmt.query_map([], |row| {
+        let val = row.get(0)?;
+        Ok(val)
+    })?;
+
+    let mut ret_cnt: i32 = -1;
+    for cnt in cnts {
+        if let Ok(cnt) = cnt {
+            ret_cnt = cnt;
+        }
+    }
+
+    Ok(ret_cnt)
 }

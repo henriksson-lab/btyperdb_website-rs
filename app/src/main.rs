@@ -2,12 +2,15 @@ use std::io::Cursor;
 
 use anyhow::Result;
 
-use my_web_app::StrainTableEntries;
+use my_web_app::DatabaseMetadata;
+use my_web_app::TableData;
 use my_web_app::SearchSettings;
 use my_web_app::SearchCriteria;
 
+use yew::web_sys;
 use yew::{
     format::{Json, Nothing},
+    //worker::Context,
     prelude::*,
     services::{
         fetch::{FetchTask, Request, Response},
@@ -17,7 +20,7 @@ use yew::{
 
 
 ////////////////////////////////////////////////////////////
-/// x
+/// Which page is currently being shown?
 #[derive(Debug)]
 #[derive(PartialEq)]
 enum CurrentPage {
@@ -29,28 +32,33 @@ enum CurrentPage {
 }
 
 ////////////////////////////////////////////////////////////
-/// x
+/// Message sent to the event system for updating the page
 #[derive(Debug)]
 enum Msg {
 
     OpenPage(CurrentPage),
     StartQuery,
-    SetQuery(Option<StrainTableEntries>),
+    SetQuery(Option<TableData>),
     SetSearchControlVisibility(bool),
     AddSearchFilter,
     DeleteSearchFilter(usize),
+    SetDatabaseMetadata(DatabaseMetadata),
+    FetchDatabaseMetadata,
+
+    ChangedSearchField(usize, String),
 }
 
 ////////////////////////////////////////////////////////////
-/// x
+/// State of the page
 struct Model {
     link: ComponentLink<Self>,
     current_page: CurrentPage,
-    tabledata: Option<StrainTableEntries>,
+    tabledata: Option<TableData>,
     tabledata_from: usize,
     task: Option<FetchTask>, ///////////// why do we keep this?
     show_search_controls: bool,
     search_settings: SearchSettings,
+    db_metadata: Option<DatabaseMetadata>
 }
 
 impl Component for Model {
@@ -59,29 +67,35 @@ impl Component for Model {
     type Properties = ();
 
     ////////////////////////////////////////////////////////////
-    /// x
+    /// Create a new component
     fn create(_props: Self::Properties, link: ComponentLink<Self>) -> Self {
 
 
+        // For testing
+        let tabledata:TableData = serde_json::from_reader(Cursor::new(include_bytes!("testdata.json"))).unwrap();
 
-        // Read the JSON contents of the file as an instance of `User`.
-        let tabledata:StrainTableEntries = serde_json::from_reader(Cursor::new(include_bytes!("testdata.json"))).unwrap();
+        // For testing
+        //let tablemeta:DatabaseMetadata = serde_json::from_reader(Cursor::new(include_bytes!("testmeta.json"))).unwrap();
 
-
-
-        Self {
+        let mut comp = Self {
             link,
             current_page: CurrentPage::Home,
             tabledata: Some(tabledata), //None,
             tabledata_from: 0,
             task: None,
             show_search_controls: true,
-            search_settings: SearchSettings::new()
-        }
+            search_settings: SearchSettings::new(),
+            db_metadata: None
+        };
+
+        //Get metadata about database right away
+        comp.update(Msg::FetchDatabaseMetadata);
+
+        comp
     }
 
     ////////////////////////////////////////////////////////////
-    /// x
+    /// Handle an update message
     fn update(&mut self, msg: Self::Message) -> ShouldRender {
         match msg {
 
@@ -97,8 +111,8 @@ impl Component for Model {
                     .expect("Could not build request");
                 let callback =
                     self.link
-                        .callback(|response: Response<Json<Result<StrainTableEntries>>>| {
-                            log::debug!("{:?}", response);
+                        .callback(|response: Response<Json<Result<TableData>>>| {
+                            //log::debug!("{:?}", response);
                             let Json(data) = response.into_body();
                             Msg::SetQuery(data.ok())
                         });
@@ -108,12 +122,47 @@ impl Component for Model {
             }
 
 
+
+
+
+            Msg::FetchDatabaseMetadata => {
+                //Ask the server for metadata
+                let request = Request::get("/strainmeta")
+                        .body(Nothing)
+                        .expect("Could not build request");
+                        
+                let callback =
+                    self.link
+                        .callback(|response: Response<Json<Result<DatabaseMetadata>>>| {
+                            //log::debug!("got metadata {:?}", response);
+                            let Json(data) = response.into_body();
+                            Msg::SetDatabaseMetadata(data.ok().expect("metadata fail"))
+                        });
+                let task = FetchService::fetch(request, callback).expect("Failed to start request");
+                self.task = Some(task);
+                false
+            }
+
+
+
             Msg::SetQuery(data) => {
                 //log::trace!("SetQuery: {:?}", data);
                 self.tabledata = data;
                 self.tabledata_from = 0;
                 true
             }
+
+
+
+            Msg::SetDatabaseMetadata(data) => {
+                //log::trace!("SetDatabaseMetadata: {:?}", data);
+                self.db_metadata = Some(data);
+
+                //TODO: populate search box
+
+                true
+            }
+
 
             Msg::SetSearchControlVisibility(data) => {
                 //log::trace!("SetSearchControlVisibility: {:?}", data);
@@ -135,11 +184,26 @@ impl Component for Model {
             }
 
 
+            Msg::ChangedSearchField(i, val) => {
+
+                self.search_settings.criteria.get_mut(i).expect("boho").from=val;
+
+/*
+                self.db_metadata.iter_mut().map(|metadata| {
+
+                    metadata.columns.get_mut(i).unwrap().
+
+                });
+ */
+
+                false
+            }
             
 
 
         }
     }
+
 
 
     ////////////////////////////////////////////////////////////
@@ -149,9 +213,8 @@ impl Component for Model {
     }
 
 
-
     ////////////////////////////////////////////////////////////
-    /// x
+    /// Top renderer of the page
     fn view(&self) -> Html {
 
         let current_page = match self.current_page { 
@@ -188,7 +251,7 @@ impl Component for Model {
 
 ////////////////////////////////////////////////////////////
 /// If condition is met, return "active", otherwise "". For CSS styling of which control is active
-fn active_if(cond: bool) -> String {
+pub fn active_if(cond: bool) -> String {
     if cond {
         "active".to_string()
     } else {
@@ -199,29 +262,76 @@ fn active_if(cond: bool) -> String {
 
 
 
+////////////////////////////////////////////////////////////
+/// If condition is met, return "selected", otherwise "". For OPTION
+pub fn selected_if(cond: bool) -> String {
+    if cond {
+        "selected".to_string()
+    } else {
+        "".to_string()
+    }
+}   // can do true false https://yew.rs/docs/concepts/html 
+
+
+
 impl Model {
 
     ////////////////////////////////////////////////////////////
-    /// x
-    fn view_search_line(&self, i: usize) -> Html {
-
+    /// One of the search fields
+    fn view_search_line(&self, metadata: &DatabaseMetadata, i: usize) -> Html {
 
         let crit = self.search_settings.criteria.get(i).unwrap();
+        
+
+
+/*
+        //meah https://yew.rs/docs/concepts/html/events
+    let on_cautious_change = {
+        let input_value_handle = input_value_handle.clone();
+
+        Callback::from(move |e: Event| {
+            // When events are created the target is undefined, it's only
+            // when dispatched does the target get added.
+            let target: Option<EventTarget> = e.target();
+            // Events can bubble so this listener might catch events from child
+            // elements which are not of type HtmlInputElement
+            let input = target.and_then(|t| t.dyn_into::<HtmlInputElement>().ok());
+
+            if let Some(input) = input {
+                input_value_handle.set(input.value());
+            }
+        })
+    };
+
+
+    // check https://docs.rs/yew-components/latest/src/yew_components/select.rs.html
+
+
+ */
 
         html! {
-			<div class="divSearchField" onclick=self.link.callback(move |_| Msg::DeleteSearchFilter(i))>
-				<button name="bDelete" class="buttonspacer">
+			<div class="divSearchField">
+				<button name="bDelete" class="buttonspacer" onclick=self.link.callback(move |_| Msg::DeleteSearchFilter(i))>
                     {"X"}
                 </button>
 				<select class="columndrop" name="selectfield">
-					<option value="BTyperDB_ID">{"BTyperDB_ID"}</option>
-					<option value="NCBI_BioSample">{"NCBI_BioSample"}</option>
+                    {
+                        metadata.columns.clone().into_iter().map(|col| { /////////////////////////////////////////////// check why so much cloning needed
+                            html!{
+                                <option value={col.column_id.clone()}>  //////  selected="selected"  if the one
+                                    { col.column_id.clone() }
+                                </option>
+                            }
+                        }).collect::<Html>()
+                    }
 				</select>
 				<label>
                     {" From: "}
-					<input class="textbox" type="text" name="value" value="20000"/>
+					<input class="textbox" type="text" name="value" value={crit.from.clone()} 
+             //       oninput=self.link.callback(move |e: web_sys::InputEvent| Msg::ChangedSearchField(i, e.value))
+                    /> ////////////// if edited, should update underlying model 666
                     {" To: "}
-					<input class="textbox" type="text" name="value2" value="1000000000"/>
+					<input class="textbox" type="text" name="value2" value={crit.to.clone()}/>
 				</label>				
 			</div>
         }
@@ -231,30 +341,38 @@ impl Model {
 
 
     ////////////////////////////////////////////////////////////
-    /// x
+    /// Page: Search
     fn view_search_pane(&self) -> Html {
 
-        let search_controls = html! {
-            <div>
-                <div class="withspacer"> /////////likely need to fix divs here
-                </div>
+        let search_controls = if let Some(metadata) = &self.db_metadata {
+
+            html! {
                 <div>
-                    {
-                        (0..self.search_settings.criteria.len()).into_iter().map(|i| { 
-                            html!{  self.view_search_line(i)  }
-                        }).collect::<Html>()
-                    }
-                    <div>                        
-                        <button class="buttonspacer" onclick=self.link.callback(|_| Msg::AddSearchFilter)>
-                            {"Add filter"}
-                        </button>
-                        <button class="buttonspacer" onclick=self.link.callback(|_| Msg::StartQuery)>
-                            {"Search"}
-                        </button>
+                    <div class="withspacer"> /////////likely need to fix divs here
+                    </div>
+                    <div>
+                        {
+                            (0..self.search_settings.criteria.len()).into_iter().map(|i| { 
+                                html!{  self.view_search_line(metadata, i)  }
+                            }).collect::<Html>()
+                        }
+                        <div>                        
+                            <button class="buttonspacer" onclick=self.link.callback(|_| Msg::AddSearchFilter)>
+                                {"Add filter"}
+                            </button>
+                            <button class="buttonspacer" onclick=self.link.callback(|_| Msg::StartQuery)>
+                                {"Search"}
+                            </button>
+                        </div>
                     </div>
                 </div>
-            </div>
+            }
+
+        } else {
+            html! {{""}}
         };
+
+        
 
         let visibility=self.show_search_controls;
 
@@ -278,7 +396,7 @@ impl Model {
 
 
     ////////////////////////////////////////////////////////////
-    /// x
+    /// Page: Help
     fn view_help_pane(&self) -> Html {
         html! {
             <div>
@@ -301,7 +419,7 @@ impl Model {
 
 
     ////////////////////////////////////////////////////////////
-    /// x
+    /// Page: Statistics about the database
     fn view_statistics_pane(&self) -> Html {
 
         html! {
@@ -448,6 +566,12 @@ impl Model {
     /// x
     fn view_landing_page(&self) -> Html {
 
+        let num_strain = if let Some(metadata) = &self.db_metadata {
+            format!("{}", metadata.num_strain)
+        } else {
+            "___".to_string()
+        };
+
         html! {
 
             <div class="landingdiv">
@@ -462,12 +586,17 @@ impl Model {
                 </p>
 
                 <p style="color: rgb(0, 150, 255);">
-                    {"xxx total B. cereus group genomes with curated metadata"}
+                    {num_strain} {" total B. cereus group genomes with curated metadata"}
                 </p>
 
                 <button class="toolbutton" onclick=self.link.callback(|_| Msg::OpenPage(CurrentPage::Search))>
                     {"Search BTyperDB"}
                 </button>
+
+                <button class="toolbutton" onclick=self.link.callback(|_| Msg::FetchDatabaseMetadata)>
+                    {"debug BTyperDB"}
+                </button>
+
 
             </div>
         }
