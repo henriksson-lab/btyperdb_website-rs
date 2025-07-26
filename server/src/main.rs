@@ -1,6 +1,9 @@
 use std::num::NonZero;
 use std::sync::Mutex;
 
+use std::collections::BTreeMap;
+
+
 use actix_files::Files;
 use actix_web::{get, web, web::Data, App, HttpResponse, HttpServer, Responder};
 use log::info;
@@ -105,14 +108,14 @@ pub fn read_database_metadata (
 
     /////////// Other metadata from CSV-file
 
-    let mut outlist = Vec::new();
+    let mut outlist = BTreeMap::new();//::new();
 
     let mut reader = csv::ReaderBuilder::new()
         .delimiter(b'\t')
         .from_reader(src);
     for result in reader.deserialize() {
         let record: DatabaseColumn = result.unwrap();
-        outlist.push(record);
+        outlist.insert(record.column_id.clone(), record);
     }
 
     DatabaseMetadata {

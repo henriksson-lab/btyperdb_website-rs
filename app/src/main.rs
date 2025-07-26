@@ -7,10 +7,8 @@ use my_web_app::TableData;
 use my_web_app::SearchSettings;
 use my_web_app::SearchCriteria;
 
-use yew::web_sys;
 use yew::{
     format::{Json, Nothing},
-    //worker::Context,
     prelude::*,
     services::{
         fetch::{FetchTask, Request, Response},
@@ -45,7 +43,9 @@ enum Msg {
     SetDatabaseMetadata(DatabaseMetadata),
     FetchDatabaseMetadata,
 
-    ChangedSearchField(usize, String),
+    ChangedSearchFieldType(usize, ChangeData),
+    ChangedSearchFieldFrom(usize, String),
+    ChangedSearchFieldTo(usize, String),
 }
 
 ////////////////////////////////////////////////////////////
@@ -171,9 +171,22 @@ impl Component for Model {
             }
 
             Msg::AddSearchFilter => {
-                //log::trace!("AddSearchFilter: {:?}", data);
-                let c = SearchCriteria::new();
-                self.search_settings.criteria.push(c);
+                if let Some(metadata) = &self.db_metadata {
+
+                    let col = metadata.columns.get("BTyperDB_ID").expect("no BTyperDB_ID column");
+
+                    //let all_columns: Vec<String> = metadata.columns.iter().map(|x| x.column_id.clone()).collect();
+                    //let default_element = all_columns.get(0).expect("empty list");
+
+                    //log::trace!("AddSearchFilter: {:?}", data);
+                    let mut c = SearchCriteria::new();
+                    c.field=col.column_id.clone();
+                    c.from=col.default_v1.clone();
+                    c.to=col.default_v2.clone();
+
+                    self.search_settings.criteria.push(c);
+
+                }
                 true
             },
 
@@ -184,21 +197,46 @@ impl Component for Model {
             }
 
 
-            Msg::ChangedSearchField(i, val) => {
+            Msg::ChangedSearchFieldType(i, val) => {
+                if let ChangeData::Select(d) = val {
+                    let val = d.value();
 
-                self.search_settings.criteria.get_mut(i).expect("boho").from=val;
+                    let crit = self.search_settings.criteria.get_mut(i).expect("Could not get field");
+                    crit.field = val;
+                    //log::debug!("set field {:?}", field);
 
-/*
-                self.db_metadata.iter_mut().map(|metadata| {
+                    if let Some(db_metadata) = &self.db_metadata {
 
-                    metadata.columns.get_mut(i).unwrap().
+                        let column_metadata = db_metadata.columns.get(&crit.field).expect("no column");
 
-                });
- */
+                        log::debug!("field info {:?} {:?}", crit.field, column_metadata);                        
 
+                        crit.from=column_metadata.default_v1.clone();
+                        crit.to=column_metadata.default_v2.clone();
+
+                        log::debug!("ChangedSearchFieldType: {:?}", crit);
+                    }
+
+
+                    //todo update from-to etc
+                    //could be beneficial to do this in subcomponent; would it avoid rerendering everything?
+                }
+                true
+            }
+
+            Msg::ChangedSearchFieldFrom(i, val) => {
+                let field = self.search_settings.criteria.get_mut(i).expect("Could not get field");
+                field.from = val;
+                //log::debug!("got f {:?}", field);
                 false
             }
             
+            Msg::ChangedSearchFieldTo(i, val) => {
+                let field = self.search_settings.criteria.get_mut(i).expect("Could not get field");
+                field.to = val;
+                //log::debug!("got f {:?}", field);
+                false
+            }
 
 
         }
@@ -282,57 +320,63 @@ impl Model {
 
         let crit = self.search_settings.criteria.get(i).unwrap();
         
-
-
-/*
         //meah https://yew.rs/docs/concepts/html/events
-    let on_cautious_change = {
-        let input_value_handle = input_value_handle.clone();
+        // check https://docs.rs/yew-components/latest/src/yew_components/select.rs.html
 
-        Callback::from(move |e: Event| {
-            // When events are created the target is undefined, it's only
-            // when dispatched does the target get added.
-            let target: Option<EventTarget> = e.target();
-            // Events can bubble so this listener might catch events from child
-            // elements which are not of type HtmlInputElement
-            let input = target.and_then(|t| t.dyn_into::<HtmlInputElement>().ok());
+        let onchange_field = self.link.callback(move |e: ChangeData | {
+            Msg::ChangedSearchFieldType(i, e)
+        });
+        // batch_callback  use instead
+        let oninput_from = self.link.callback(move |e: InputData | {
+            Msg::ChangedSearchFieldFrom(i, e.value)
+        });
+        let oninput_to = self.link.callback(move |e: InputData | {
+            Msg::ChangedSearchFieldTo(i, e.value)
+        });
+        
+        log::debug!("render {:?}",crit);
 
-            if let Some(input) = input {
-                input_value_handle.set(input.value());
+
+        let coltype = metadata.columns.get(&crit.field.clone()).unwrap().column_type.clone();
+        let is_ranged_type = coltype=="integer" || coltype=="float";
+        //possible values: text  integer float   
+
+        let html_values = if is_ranged_type {
+            html! {
+                <label>
+                    {" From: "}
+                    <input class="textbox" type="text" name="value1" value={crit.from.clone()} oninput={oninput_from}/> 
+                    {" To: "}
+                    <input class="textbox" type="text" name="value2" value={crit.to.clone()} oninput={oninput_to}/>
+                </label>				
             }
-        })
-    };
+        } else {
+            html! {
+                <label>
+                    {" Is: "}
+                    <input class="textbox" type="text" name="value" value={crit.from.clone()} oninput={oninput_from}/> 
+                </label>				
+            }
+        };
 
-
-    // check https://docs.rs/yew-components/latest/src/yew_components/select.rs.html
-
-
- */
 
         html! {
 			<div class="divSearchField">
 				<button name="bDelete" class="buttonspacer" onclick=self.link.callback(move |_| Msg::DeleteSearchFilter(i))>
                     {"X"}
                 </button>
-				<select class="columndrop" name="selectfield">
+				<select class="columndrop" name="selectfield" onchange={onchange_field}>
                     {
-                        metadata.columns.clone().into_iter().map(|col| { /////////////////////////////////////////////// check why so much cloning needed
+                        metadata.columns.keys().clone().into_iter().map(|col| { /////////////////////////////////////////////// check why so much cloning needed
                             html!{
-                                <option value={col.column_id.clone()}>  //////  selected="selected"  if the one
-                                    { col.column_id.clone() }
+                                <option value={col.clone()} selected={*col == crit.field}>  //////  selected="selected"  if the one
+                                    { col.clone() }
                                 </option>
                             }
                         }).collect::<Html>()
                     }
 				</select>
-				<label>
-                    {" From: "}
-					<input class="textbox" type="text" name="value" value={crit.from.clone()} 
-             //       oninput=self.link.callback(move |e: web_sys::InputEvent| Msg::ChangedSearchField(i, e.value))
-                    /> ////////////// if edited, should update underlying model 666
-                    {" To: "}
-					<input class="textbox" type="text" name="value2" value={crit.to.clone()}/>
-				</label>				
+                { html_values }
 			</div>
         }
         

@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+use std::collections::BTreeMap;
+
 ////////////////////////////////////////////////////////////
 /// Strain table data
 #[derive(Debug, Deserialize, Serialize)]
@@ -15,13 +17,14 @@ pub struct TableData {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct DatabaseMetadata {
     pub num_strain: i32,
-    pub columns: Vec<DatabaseColumn>
+    pub columns: BTreeMap<String, DatabaseColumn>
+//    pub columns: Vec<DatabaseColumn>
 }
 impl DatabaseMetadata {
     pub fn new() -> DatabaseMetadata {
         DatabaseMetadata {
             num_strain: -1,
-            columns: vec![]
+            columns: BTreeMap::new() //vec![]
         }
     }
 }
@@ -53,7 +56,7 @@ pub struct DatabaseColumn {
 
 
 
-
+#[derive(Debug, Serialize, Deserialize, Eq, PartialEq, Clone)]
 pub struct SearchSettings {
     pub criteria: Vec<SearchCriteria>
 }
@@ -70,7 +73,7 @@ impl SearchSettings {
     }
 }
 
-
+#[derive(Debug, Serialize, Deserialize, Eq, PartialEq, Clone)]
 pub struct SearchCriteria {
     pub field: String,
     pub from: String,
