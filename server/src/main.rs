@@ -24,6 +24,8 @@ extern crate rusqlite;
 
 use rusqlite::{Connection, Result};
 
+type DatabaseHistogram = Vec<(String,i32)>;
+
 ////////////////////////////////////////////////////////////
 /// Backend state
 pub struct ServerData {
@@ -89,27 +91,29 @@ pub fn sql_stringarg_escape(s: &String) -> String {
 
 
 pub fn sql_check_name(s: &String) -> String {
+    let mut out =String::new();
     if s.len()==0 {
         panic!("invalid name as it is empty");
     }
 
-    let valid_char="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVQXYZ0123456789_".as_bytes();
-    for b in s.as_bytes() {
-        if !valid_char.contains(b) {
-            panic!("invalid character in name {}", b);
+    //let valid_char="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVQXYZ0123456789_()[]".as_bytes();  
+    for c in s.chars() {
+        if c==' ' {
+            out.push('_');
+        } /*else if !valid_char.contains(b) {
+            panic!("invalid character in name {}", b); ///////////////// fix
+        } */ else {
+            out.push(c);
         }
     }
-    s.clone()
+    out
 }
 
 
 
 
 pub fn build_straindb_search(search: &SearchSettings) -> String {
-
-    let mut query = "SELECT * ".to_string();
-
-    query.push_str(" FROM straindata ");
+    let mut query = "SELECT * FROM straindata ".to_string();
 
     //let mut list_params:Vec<String> = Vec::new();
     //https://docs.rs/rusqlite/latest/rusqlite/struct.Statement.html
@@ -147,6 +151,7 @@ async fn main() -> std::io::Result<()> {
 
     let path = "/Users/mahogny/Desktop/rust/2_actix-yew-template/minimal_testing/meta/data.sqlite";
     let conn = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY).expect("Could not open database");
+
 
     let db_metadata = read_database_metadata(
         Cursor::new(include_bytes!("/Users/mahogny/Desktop/rust/2_actix-yew-template/minimal_testing/meta/btyperdb_include.tsv")),
@@ -196,6 +201,11 @@ pub fn read_database_metadata (
     conn: &Connection
 ) -> DatabaseMetadata { 
 
+    let hist_source1 = query_histogram(&conn, &"Source_1".to_string()).expect("Failed to make histogram");
+    let hist_pancgroup = query_histogram(&conn, &"BTyper3_Adjusted_panC_Group(predicted_species)".to_string()).expect("Failed to make histogram");
+    let hist_gtdb_species = query_histogram(&conn, &"GTDB_Species".to_string()).expect("Failed to make histogram");
+    let hist_humanillness = query_histogram(&conn, &"Human_Illness".to_string()).expect("Failed to make histogram");
+    let hist_country = query_histogram(&conn, &"Country_Code".to_string()).expect("Failed to make histogram");    
 
     let num_strain = query_get_strain_count(&conn).expect("Could not get SQL strain count");
 
@@ -213,7 +223,12 @@ pub fn read_database_metadata (
 
     DatabaseMetadata {
         columns: outlist,
-        num_strain: num_strain
+        num_strain: num_strain,
+        hist_humanillness: hist_humanillness,
+        hist_source1: hist_source1,
+        hist_pancgroup: hist_pancgroup,
+        hist_gtdb_species: hist_gtdb_species,
+        hist_country: hist_country
     }
 }
 
@@ -305,6 +320,37 @@ pub fn query_get_strain_count(
             ret_cnt = cnt;
         }
     }
-
     Ok(ret_cnt)
+}
+
+
+
+
+
+
+////////////////////////////////////////////////////////////
+/// 
+pub fn query_histogram(
+    conn: &Connection,
+    colname: &String
+) -> Result<DatabaseHistogram> {
+
+    let mut stmt = conn.prepare(format!("SELECT `{}` as grp, count(*) as cnt FROM straindata group by grp ORDER BY cnt DESC", colname).as_str())?; ////////// TODO: escape name of column?
+
+    let cnts = stmt.query_map([], |row| {
+        let name:String = row.get(0)?;
+        let cnt:i32 = row.get(1)?;
+        Ok((name, cnt))
+    })?;
+
+    let mut outlist=Vec::new();
+    for name_cnt in cnts {
+        if let Ok(name_cnt) = name_cnt {
+            outlist.push(name_cnt);
+        }
+    }
+
+    println!("{:?}",outlist);
+
+    Ok(outlist)
 }

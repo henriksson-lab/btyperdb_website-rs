@@ -2,6 +2,9 @@ use serde::{Deserialize, Serialize};
 
 use std::collections::BTreeMap;
 
+type DatabaseHistogram = Vec<(String,i32)>;
+
+
 ////////////////////////////////////////////////////////////
 /// Strain table data
 #[derive(Debug, Deserialize, Serialize)]
@@ -17,14 +20,25 @@ pub struct TableData {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct DatabaseMetadata {
     pub num_strain: i32,
-    pub columns: BTreeMap<String, DatabaseColumn>
-//    pub columns: Vec<DatabaseColumn>
+    pub columns: BTreeMap<String, DatabaseColumn>,
+    pub hist_humanillness: DatabaseHistogram,
+    pub hist_source1: DatabaseHistogram,
+    pub hist_pancgroup: DatabaseHistogram,
+    pub hist_gtdb_species: DatabaseHistogram,
+    pub hist_country: DatabaseHistogram,
+
+    
 }
 impl DatabaseMetadata {
     pub fn new() -> DatabaseMetadata {
         DatabaseMetadata {
             num_strain: -1,
-            columns: BTreeMap::new() //vec![]
+            columns: BTreeMap::new(),
+            hist_humanillness: Vec::new(),
+            hist_source1: Vec::new(),
+            hist_pancgroup: Vec::new(),
+            hist_gtdb_species: Vec::new(),
+            hist_country: Vec::new(),
         }
     }
 }
