@@ -92,3 +92,8 @@ impl SearchCriteria {
 }
 
 
+
+pub enum ComparisonType {
+    Like,
+    FromTo,
+}

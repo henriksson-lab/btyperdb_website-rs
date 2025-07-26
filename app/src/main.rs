@@ -106,17 +106,26 @@ impl Component for Model {
 
 
             Msg::StartQuery => {
-                let request = Request::get("/straindata")
-                    .body(Nothing)
+                let json = serde_json::to_string(&self.search_settings).expect("Failed to generate json");
+
+                log::debug!("sending {}", json);
+
+                //let request = Request::get("/straindata") /////////// do post instead
+                let request = Request::post("/straindata")
+                    .header("Content-Type", "application/json")
+//                    .body(Json(&json))  //do not use!! escapes the data resulting in error 400
+                    .body(Ok(json))
                     .expect("Could not build request");
                 let callback =
-                    self.link
-                        .callback(|response: Response<Json<Result<TableData>>>| {
-                            //log::debug!("{:?}", response);
-                            let Json(data) = response.into_body();
-                            Msg::SetQuery(data.ok())
-                        });
-                let task = FetchService::fetch(request, callback).expect("Failed to start request");
+                    self.link.callback(|response: Response<Json<Result<TableData>>>| {
+                        //log::debug!("{:?}", response);
+                        let Json(data) = response.into_body();
+                        Msg::SetQuery(data.ok())
+                    });
+                let task = FetchService::fetch(
+                    request, 
+                    callback).expect("Failed to start request");
+                //store the task so it isn't canceled immediately
                 self.task = Some(task);
                 false
             }
@@ -334,7 +343,7 @@ impl Model {
             Msg::ChangedSearchFieldTo(i, e.value)
         });
         
-        log::debug!("render {:?}",crit);
+        //log::debug!("render {:?}",crit);
 
 
         let coltype = metadata.columns.get(&crit.field.clone()).unwrap().column_type.clone();
