@@ -6,6 +6,7 @@ pub mod model_stats;
 pub mod model_table;
 pub mod model_help;
 pub mod component_map;
+pub mod download;
 
 use crate::core_model::*;
 

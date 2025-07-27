@@ -20,8 +20,8 @@ use crate::escaping::*;
 
 ////////////////////////////////////////////////////////////
 /// x
-#[post("/strainfastq")]
-pub async fn strainfastq(server_data: Data<Mutex<ServerData>>, req_body: web::Json<StrainRequest>) -> HttpResponse {
+#[post("/strainfasta")]
+pub async fn strainfasta(server_data: Data<Mutex<ServerData>>, req_body: web::Json<StrainRequest>) -> HttpResponse {
     println!("{:?}",req_body); 
     let Json(req) = req_body;
 
@@ -50,13 +50,11 @@ pub async fn strainfastq(server_data: Data<Mutex<ServerData>>, req_body: web::Js
 
             let fname_outer = format!("{}.fna", f);
             let file_path = path_fna.join(&fname_outer);
-//            let fname=format!("{}.fna", path_store, f);
-            //let file_path = Path::new(&fname);
 
             //Future option: if each file already zipped, could directly concatenate their contents
             let mut file = File::open(file_path).await.unwrap();
             archive
-                .append(&format!("fastq/{}", f), &options, &mut file)
+                .append(&format!("fastq/{}.fasta", f), &options, &mut file)
                 .await
                 .unwrap();
         }

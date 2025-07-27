@@ -30,6 +30,11 @@ impl Model {
             "___".to_string()
         };
 
+
+
+        //let download = self.link.callback(move |_e | {Msg::Download});
+
+
         html! {
 
             <div class="landingdiv">
@@ -50,13 +55,6 @@ impl Model {
                 <button class="toolbutton" onclick=self.link.callback(|_| Msg::OpenPage(CurrentPage::Search))>
                     {"Search BTyperDB"}
                 </button>
-
-/*
-                <button class="toolbutton" onclick=self.link.callback(|_| Msg::FetchDatabaseMetadata)>
-                    {"debug BTyperDB"}
-                </button>
- */
-
 
             </div>
         }

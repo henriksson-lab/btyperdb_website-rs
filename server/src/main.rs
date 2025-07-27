@@ -93,7 +93,7 @@ async fn main() -> std::io::Result<()> {
             .wrap(actix_web::middleware::Logger::default())  //for debugging
             .service(straindata)
             .service(strainmeta)
-            .service(strainfastq)
+            .service(strainfasta)
             .service(Files::new("/", "./dist/").index_file("index.html"))
             .default_service(
                 web::route().to(|| HttpResponse::NotFound()),  //header("Location", "/").finish()

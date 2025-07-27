@@ -1,9 +1,11 @@
+use std::collections::HashSet;
 use std::io::Cursor;
 
 use anyhow::Result;
 
 use my_web_app::ComparisonType;
 use my_web_app::DatabaseMetadata;
+use my_web_app::StrainRequest;
 use my_web_app::TableData;
 use my_web_app::SearchSettings;
 use my_web_app::SearchCriteria;
@@ -11,6 +13,8 @@ use my_web_app::SearchCriteria;
 use geojson::GeoJson;
 
 
+use web_sys::window;
+use yew::format::Binary;
 use yew::{
     format::{Json, Nothing},
     prelude::*,
@@ -19,6 +23,11 @@ use yew::{
         FetchService,
     },
 };
+
+//use crate::download::download_fasta;
+//use crate::download::download_metadata;
+
+use crate::download::*;
 
 ////////////////////////////////////////////////////////////
 /// Which page is currently being shown?
@@ -30,6 +39,15 @@ pub enum CurrentPage {
     Statistics,
     Help,
     About,
+}
+
+
+////////////////////////////////////////////////////////////
+/// 
+#[derive(Debug)]
+pub enum IncludeData {
+    All,
+    Selected
 }
 
 ////////////////////////////////////////////////////////////
@@ -52,7 +70,14 @@ pub enum Msg {
     ChangedSearchFieldLike(usize, String),
 
     SetTableFrom(usize),
+    DownloadFASTA(IncludeData),
+    DownloadMetadata(IncludeData),
+    DownloadFASTAgot(Vec<u8>),
+
+    SetStrainSelected(String, bool),
 }
+
+
 
 ////////////////////////////////////////////////////////////
 /// State of the page
@@ -61,12 +86,17 @@ pub struct Model {
     pub current_page: CurrentPage,
     pub tabledata: Option<TableData>,
     pub tabledata_from: usize,
+
     pub task: Option<FetchTask>, ///////////// why do we keep this?
+    pub download_task: Option<FetchTask>, ///////////// why do we keep this?
+        
     pub show_search_controls: bool,
     pub search_settings: SearchSettings,
     pub db_metadata: Option<DatabaseMetadata>,
 
     pub geojson: GeoJson,
+
+    pub selected_strains: HashSet<String>,
 }
 
 impl Component for Model {
@@ -101,11 +131,16 @@ impl Component for Model {
             current_page: CurrentPage::Home,
             tabledata: Some(tabledata), //None,
             tabledata_from: 0,
+            
             task: None,
+            download_task: None,
+
             show_search_controls: true,
             search_settings: SearchSettings::new(),
             db_metadata: None,
             geojson: geojson,
+
+            selected_strains: HashSet::new(),
         };
 
         //Get metadata about database right away
@@ -161,8 +196,7 @@ impl Component for Model {
                 //Ask the server for metadata
                 let request = Request::get("/strainmeta")
                         .body(Nothing)
-                        .expect("Could not build request");
-                        
+                        .expect("Could not build request");                        
                 let callback =
                     self.link
                         .callback(|response: Response<Json<Result<DatabaseMetadata>>>| {
@@ -181,6 +215,7 @@ impl Component for Model {
                 //log::trace!("SetQuery: {:?}", data);
                 self.tabledata = data;
                 self.tabledata_from = 0;
+                self.selected_strains.clear();
                 true
             }
 
@@ -271,8 +306,6 @@ impl Component for Model {
                 if let ComparisonType::Like(v) = &mut field.comparison {
                     *v = val;
                 }
-//                field.to = val;
-                //log::debug!("got f {:?}", field);
                 false
             }
 
@@ -281,7 +314,80 @@ impl Component for Model {
             Msg::SetTableFrom(from) => {
                 self.tabledata_from = from;
                 true
-            }
+            },
+
+            Msg::DownloadFASTAgot(data) => {
+                log::debug!("DownloadFASTAgot");
+                self.download_fasta(&data);
+                self.download_task=None; //Might save memory
+                false
+            },
+
+
+            Msg::DownloadFASTA(inc) => {
+                log::debug!("trying to download");
+
+                let list_strains = self.get_strains(&inc);
+                log::debug!("Asking to download {:?}", list_strains);
+
+                if list_strains.is_empty() {
+                    alert("No strains to download");
+                } else {
+                    let req = StrainRequest {
+                        list: list_strains
+                    };
+
+                    let json = serde_json::to_string(&req).expect("Failed to generate json");
+                    //log::debug!("sending {}", json);
+                    let bin = json.as_bytes().to_vec();
+
+                    //let request = Request::get("/straindata") /////////// do post instead
+                    let request = Request::post("/strainfasta")
+                        .header("Content-Type", "application/json")
+                        .body(Ok(bin))
+                        //.body(Ok(json))
+                        .expect("Could not build request");
+                    let callback =
+                        self.link.callback(|response: Response<Binary>| {
+                            //log::debug!("{:?}", response);
+                            let data = response.into_body().expect("Could not get binary data");
+                            log::debug!("Got data {}", data.len());
+
+                            Msg::DownloadFASTAgot(data)
+                            //Msg::SetQuery(data.ok())
+                        });
+                    let task = FetchService::fetch_binary(
+                        request, 
+                        callback).expect("Failed to start request");
+                    //store the task so it isn't canceled immediately
+                    self.download_task = Some(task);
+                }        
+                false        
+            },
+
+            Msg::DownloadMetadata(inc) => {
+                log::debug!("trying to download");
+
+                let list_strains = self.get_strains(&inc);
+                log::debug!("Asking to download {:?}", list_strains);
+
+                if list_strains.is_empty() {
+                    alert("No strains to download");
+                } else {
+                    self.download_metadata(&list_strains);
+                }
+                false                
+            },
+
+
+            Msg::SetStrainSelected(id, tosel) => {
+                if tosel {
+                    self.selected_strains.insert(id);
+                } else {
+                    self.selected_strains.remove(&id);
+                }
+                false
+            },
 
 
         }
@@ -329,6 +435,13 @@ impl Component for Model {
             </div>
         }
     }
+
+
+
+
+
+
+
 }
 
 
@@ -347,4 +460,9 @@ pub fn active_if(cond: bool) -> String {
 
 
 
-
+////////////////////////////////////////////////////////////
+/// Show an alert message
+pub fn alert(s: &str) {
+    let window = window().expect("no window");
+    window.alert_with_message(s).unwrap();
+}

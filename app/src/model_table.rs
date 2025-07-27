@@ -9,10 +9,48 @@ impl Model {
 
     ////////////////////////////////////////////////////////////
     /// x
+    pub fn get_strains(&self, inc: &IncludeData) -> Vec<String> {
+    
+                    //list_strains.push("BTDB_2022-0001042.1".to_string());
+
+        let mut list_strains = Vec::new();
+        match inc {
+            IncludeData::All => {
+                if let Some(tabledata) = &self.tabledata {
+                    for r in &tabledata.rows {
+                        let id = r.get(0).expect("no col 0"); /////////////////// is this btyperid?
+                        list_strains.push(id.clone());
+                    }
+                }
+            },
+            IncludeData::Selected => {
+                for e in &self.selected_strains {
+                    list_strains.push(e.clone());
+                }
+            }                    
+        }
+        list_strains
+    }
+
+
+    ////////////////////////////////////////////////////////////
+    /// x
     pub fn view_table_row(&self, row: &Vec<String>) -> Html {
         let btyper_id = row.get(0).expect("Could not get first column of row to use as id");
+
+        let is_selected=self.selected_strains.contains(btyper_id);
+
+        let btyper_id_copy= btyper_id.clone();
+        let onclick: Callback<MouseEvent> = self.link.callback(move |_e | {
+            Msg::SetStrainSelected(btyper_id_copy.clone(), !is_selected)
+        });
+
+
         html! {
             <tr key={btyper_id.clone()}>
+                <td>
+                    <input type="checkbox" key="check" onclick={onclick} checked={is_selected}/>  /////////// checked="checked"
+                </td>
                 {
                     row.clone().iter().enumerate().map(|(i, val)| {  /////////////////////////////////////////////// check why so much cloning needed
                         html!{<td key={i}>{ val.clone() }</td>}
@@ -34,6 +72,9 @@ impl Model {
             } else {
                 let html_header = html! {
                     <tr>
+                        <td>
+                            //// space for checkbox
+                        </td>
                         {
                             dt.columns.clone().into_iter().map(|name| { /////////////////////////////////////////////// check why so much cloning needed
                                 html!{<th key={name.clone()}>{ name.clone() }</th>}

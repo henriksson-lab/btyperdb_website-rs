@@ -134,6 +134,22 @@ impl Model {
 
                 { self.view_table() }
 
+                <div class="downloadnav">
+                    <button class="buttonspacer" onclick={self.link.callback(move |_e | {Msg::DownloadFASTA(IncludeData::Selected)})}>
+                        {"FASTA: Download selected"}
+                    </button>
+                    <button class="buttonspacer" onclick={self.link.callback(move |_e | {Msg::DownloadFASTA(IncludeData::All)})}>
+                        {"FASTA: Download all"}
+                    </button>
+
+                    <button class="buttonspacer" onclick={self.link.callback(move |_e | {Msg::DownloadMetadata(IncludeData::Selected)})}>
+                        {"Metadata: Download selected"}
+                    </button>
+                    <button class="buttonspacer" onclick={self.link.callback(move |_e | {Msg::DownloadMetadata(IncludeData::All)})}>
+                        {"Metadata: Download all"}
+                    </button>
+                </div>
+
             </div>
         }
         
