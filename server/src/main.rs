@@ -54,10 +54,14 @@ async fn main() -> std::io::Result<()> {
     std::env::set_var("RUST_BACKTRACE", "1");
     env_logger::init();
 
-    let config_file:ConfigFile = serde_json::from_reader(
-        Cursor::new(include_bytes!("../config.json")) ////////// or take relate to starting directory
-    ).expect("Could not open config file");
+    // Read the config file
+    let f_meta = File::open("config.json").expect("Could not open config.json");
+    let config_reader = BufReader::new(f_meta);
+    let config_file:ConfigFile = serde_json::from_reader(config_reader).expect("Could not open config file");
 
+    
+
+    // Open SQL database
     let path_store = Path::new(&config_file.store);
     let path_sql = path_store.join(Path::new("meta/data.sqlite"));
     //let path = "/Users/mahogny/Desktop/rust/2_actix-yew-template/minimal_testing/meta/data.sqlite";
