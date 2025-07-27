@@ -17,3 +17,4 @@ anyhow = "1.0.44"
 getrandom = { version = "0.2", features = ["js"] }
 log = "0.4"
 wasm-logger = "0.2"
+geojson = "0.24.2"
