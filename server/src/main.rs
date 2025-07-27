@@ -37,7 +37,8 @@ pub struct ServerData {
 
 #[derive(Debug, Deserialize, Serialize)]
 struct ConfigFile {
-    store: String
+    store: String,
+    bind: String,
 }
 
 
@@ -99,7 +100,7 @@ async fn main() -> std::io::Result<()> {
                 web::route().to(|| HttpResponse::NotFound()),  //header("Location", "/").finish()
             )
     })
-    .bind("127.0.0.1:8080")?
+    .bind(config_file.bind)? /////////////// for dev, "127.0.0.1:8080"  ; 127.0.0.1:5199 for beagle deployment
     .run()
     .await
 }
