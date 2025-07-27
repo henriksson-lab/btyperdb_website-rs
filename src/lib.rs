@@ -1,6 +1,5 @@
-use serde::{Deserialize, Serialize};
-
 use std::collections::BTreeMap;
+use serde::{Deserialize, Serialize};
 
 type DatabaseHistogram = Vec<(String,i32)>;
 
@@ -63,6 +62,11 @@ pub struct DatabaseColumn {
 
 
 
+
+#[derive(Debug, Serialize, Deserialize, Eq, PartialEq, Clone)]
+pub struct StrainRequest {
+    pub list: Vec<String>
+}
 
 
 
