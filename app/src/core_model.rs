@@ -152,7 +152,7 @@ impl Component for Model {
                 //log::debug!("sending {}", json);
                 async fn get_data(json: String) -> Msg {
                     let client = reqwest::Client::new();
-                    let res: TableData = client.post("http://localhost:8080/straindata")
+                    let res: TableData = client.post(format!("{}/straindata",get_host_url()))
                         .header("Content-Type", "application/json")
                         .body(json)
                         .send()
@@ -175,7 +175,9 @@ impl Component for Model {
             Msg::FetchDatabaseMetadata => {
                 async fn get_data() -> Msg {
                     let client = reqwest::Client::new();
-                    let res: DatabaseMetadata = client.get("http://localhost:8080/strainmeta")
+                    let url=format!("{}/strainmeta",get_host_url());
+                    //log::debug!("wtf -{}-",url);
+                    let res: DatabaseMetadata = client.get(url)  
                         .header("Content-Type", "application/json")
                         .body("")
                         //no body
@@ -313,12 +315,11 @@ impl Component for Model {
 
                     let json = serde_json::to_string(&req).expect("Failed to generate json");
                     //log::debug!("sending {}", json);
-                    //let bin = json.as_bytes().to_vec();
 
                     //log::debug!("sending {}", json);
                     async fn get_data(json: String) -> Msg {
                         let client = reqwest::Client::new();
-                        let res = client.post("http://localhost:8080/strainfasta")
+                        let res = client.post(format!("{}/strainfasta",get_host_url()))
                             .header("Content-Type", "application/json")
                             .body(json)
                             .send()
@@ -413,18 +414,6 @@ impl Component for Model {
             <div>
                 { html_top_buttons }
                 { current_page }
-                /*
-                <input list="browsers" name="browser" id="browser"/>
-                <datalist id="browsers">
-                    <option value="Edge"/>
-                    <option value="Firefox"/>
-                    <option value="Chrome"/>
-                    <option value="Opera"/>
-                    <option value="Safari"/>
-                </datalist>
- */
-                
-
             </div>
         }
     }
@@ -460,5 +449,16 @@ pub fn alert(s: &str) {
     window.alert_with_message(s).unwrap();
 }
 
+
+pub fn get_host_url() -> String {
+    let document = window().expect("no window").document().expect("no document on window");
+    let location = document.location().expect("no location");
+    let protocol = location.protocol().expect("no protocol");
+    let host = location.host().expect("no host");
+
+    let url = format!("{}//{}", protocol, host);
+    //log::debug!("{}",url);
+    url
+}
 
 // https://yew.rs/docs/next/advanced-topics/struct-components/hoc
