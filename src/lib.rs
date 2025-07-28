@@ -20,6 +20,8 @@ pub struct TableData {
 pub struct DatabaseMetadata {
     pub num_strain: i32,
     pub columns: BTreeMap<String, DatabaseColumn>,
+    pub column_dropdown: BTreeMap<String, Vec<String>>,
+
     pub hist_humanillness: DatabaseHistogram,
     pub hist_source1: DatabaseHistogram,
     pub hist_pancgroup: DatabaseHistogram,
@@ -33,11 +35,14 @@ impl DatabaseMetadata {
         DatabaseMetadata {
             num_strain: -1,
             columns: BTreeMap::new(),
+            column_dropdown: BTreeMap::new(),
+
             hist_humanillness: Vec::new(),
             hist_source1: Vec::new(),
             hist_pancgroup: Vec::new(),
             hist_gtdb_species: Vec::new(),
             hist_country: Vec::new(),
+
         }
     }
 }

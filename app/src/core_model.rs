@@ -68,6 +68,8 @@ pub enum Msg {
     DownloadFASTAgot(Vec<u8>),
 
     SetStrainSelected(String, bool),
+
+    SetCountry(String),
 }
 
 
@@ -89,6 +91,8 @@ pub struct Model {
     pub geojson: GeoJson,
 
     pub selected_strains: HashSet<String>,
+
+    pub country: String
 }
 
 impl Component for Model {
@@ -124,6 +128,8 @@ impl Component for Model {
             geojson: geojson,
 
             selected_strains: HashSet::new(),
+
+            country: "asdasd".to_string()//String::new()
         }
     }
 
@@ -245,6 +251,9 @@ impl Component for Model {
                 if let Some(db_metadata) = &self.db_metadata {
                     let column_metadata = db_metadata.columns.get(&crit.field).expect("no column");
                     crit.comparison = ComparisonType::default_comparison(column_metadata);
+                    log::debug!("{:?}",crit.comparison);
+                } else {
+                    log::debug!("Missing db metadata");
                 }
                 true
             }
@@ -351,6 +360,11 @@ impl Component for Model {
                 false
             },
 
+            Msg::SetCountry(s) => {
+                self.country=s;
+                true
+            },
+
 
         }
     }
@@ -365,22 +379,11 @@ impl Component for Model {
 
  */
 
+    //let countries = use_state(Vec::new);
+
     ////////////////////////////////////////////////////////////
     /// Top renderer of the page
     fn view(&self, ctx: &Context<Self>) -> Html {
-
-        /* 
-        use yew_autocomplete::{view::Bulma, Autocomplete, ItemResolver, ItemResolverResult};
-        use yew_commons::FnProp;
-
-        let onchange = |_: Vec<String>| ();
-        let resolve_items: ItemResolver<String> =
-            FnProp::from(|_: String| -> ItemResolverResult<String>  {
-                Box::pin(async { Ok(Vec::<String>::new()) })
-            });
-
-*/
-        
 
 
         let current_page = match self.current_page { 
@@ -410,15 +413,18 @@ impl Component for Model {
             <div>
                 { html_top_buttons }
                 { current_page }
-/* 
-                <Autocomplete<String> 
-                    resolve_items={resolve_items}
-                    onchange={onchange}
-                    auto = false
-                >
-                    <Bulma<String> />
-                </Autocomplete<String>>
-*/
+                /*
+                <input list="browsers" name="browser" id="browser"/>
+                <datalist id="browsers">
+                    <option value="Edge"/>
+                    <option value="Firefox"/>
+                    <option value="Chrome"/>
+                    <option value="Opera"/>
+                    <option value="Safari"/>
+                </datalist>
+ */
+                
+
             </div>
         }
     }

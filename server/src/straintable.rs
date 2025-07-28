@@ -92,6 +92,7 @@ pub fn read_database_metadata (
     conn: &Connection
 ) -> DatabaseMetadata { 
 
+    /////////// Gather statistics to show
     let hist_source1 = query_histogram(&conn, &"Source_1".to_string()).expect("Failed to make histogram");
     let hist_pancgroup = query_histogram(&conn, &"BTyper3_Adjusted_panC_Group(predicted_species)".to_string()).expect("Failed to make histogram");
     let hist_gtdb_species = query_histogram(&conn, &"GTDB_Species".to_string()).expect("Failed to make histogram");
@@ -101,9 +102,7 @@ pub fn read_database_metadata (
     let num_strain = query_get_strain_count(&conn).expect("Could not get SQL strain count");
 
     /////////// Other metadata from CSV-file
-
     let mut outlist = BTreeMap::new();//::new();
-
     let mut reader = csv::ReaderBuilder::new()
         .delimiter(b'\t')
         .from_reader(src);
@@ -112,9 +111,19 @@ pub fn read_database_metadata (
         outlist.insert(record.column_id.clone(), record);
     }
 
+    /////////// Drop-down values for relevant fields
+    let mut list_dropdown = BTreeMap::new();
+    for col in &vec!["Country","Country_Code","Continent","Region_Code","Source_1","Source_2","Source_3","Human_Illness","Human_Outbreak","GTDB_Species","BTyper3_Adjusted_panC_Group(predicted_species)"] {
+        let col = col.to_string();
+        list_dropdown.insert(col.clone(), query_dropdown(conn, &col).expect("Failed to create dropdown"));        
+    }
+//    println!("{:?}",list_dropdown);
+
     DatabaseMetadata {
         columns: outlist,
         num_strain: num_strain,
+        column_dropdown: list_dropdown,
+
         hist_humanillness: hist_humanillness,
         hist_source1: hist_source1,
         hist_pancgroup: hist_pancgroup,

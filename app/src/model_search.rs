@@ -2,7 +2,7 @@ use crate::core_model::*;
 use wasm_bindgen::JsCast;
 
 use my_web_app::{ComparisonType, DatabaseMetadata};
-use web_sys::{EventTarget, HtmlInputElement};
+use web_sys::{EventTarget, HtmlInputElement, HtmlSelectElement};
 use yew::{
     prelude::*,
 };
@@ -18,41 +18,29 @@ impl Model {
         //meah https://yew.rs/docs/concepts/html/events
         // check https://docs.rs/yew-components/latest/src/yew_components/select.rs.html
 
-        let onchange_field = Callback::from(move |e: Event | {
+        let onchange_field = ctx.link().callback(move |e: Event | {
             let target: Option<EventTarget> = e.target();
-            let input = target.and_then(|t| t.dyn_into::<HtmlInputElement>().ok());
-            if let Some(input) = input {
-                Msg::ChangedSearchFieldType(i, input.value());
-            }
+            let input = target.and_then(|t| t.dyn_into::<HtmlSelectElement>().ok()).expect("wrong type");
+            Msg::ChangedSearchFieldType(i, input.value())
         });
-        let oninput_from = Callback::from(move |e: Event | {
-            let target: Option<EventTarget> = e.target();
-            let input = target.and_then(|t| t.dyn_into::<HtmlInputElement>().ok());
-            if let Some(input) = input {
-                Msg::ChangedSearchFieldFrom(i, input.value());
-            }
-        });
-        let oninput_to = Callback::from(move |e: Event | {
-            let target: Option<EventTarget> = e.target();
-            let input = target.and_then(|t| t.dyn_into::<HtmlInputElement>().ok());
-            if let Some(input) = input {
-                Msg::ChangedSearchFieldTo(i, input.value());
-            }
-        });
-        let oninput_like = Callback::from(move |e: Event | {
-            let target: Option<EventTarget> = e.target();
-            let input = target.and_then(|t| t.dyn_into::<HtmlInputElement>().ok());
-            if let Some(input) = input {
-                Msg::ChangedSearchFieldLike(i, input.value());
-            }
-        });
-        
-        //log::debug!("render {:?}",crit);
 
+        let oninput_from = ctx.link().callback(move |e: Event | {
+            let target: Option<EventTarget> = e.target();
+            let input = target.and_then(|t| t.dyn_into::<HtmlInputElement>().ok()).expect("wrong type");
+            Msg::ChangedSearchFieldFrom(i, input.value())
+        });
 
-        //let coltype = metadata.columns.get(&crit.field.clone()).unwrap().column_type.clone();
-        //let is_ranged_type = coltype=="integer" || coltype=="float";
-        //possible values: text  integer float   
+        let oninput_to = ctx.link().callback(move |e: Event | {
+            let target: Option<EventTarget> = e.target();
+            let input = target.and_then(|t| t.dyn_into::<HtmlInputElement>().ok()).expect("wrong type");
+            Msg::ChangedSearchFieldTo(i, input.value())
+        });
+
+        let oninput_like = ctx.link().callback(move |e: Event | {
+            let target: Option<EventTarget> = e.target();
+            let input = target.and_then(|t| t.dyn_into::<HtmlInputElement>().ok()).expect("wrong type");
+            Msg::ChangedSearchFieldLike(i, input.value())
+        });
 
         let html_values = match &crit.comparison {
             ComparisonType::FromTo(from,to) => {
@@ -66,15 +54,40 @@ impl Model {
                 }
             },
             ComparisonType::Like(v) => {
-                html! {
-                    <label>
-                        {" Is: "}
-                        <input class="textbox" type="text" name="value" value={v.clone()} onchange={oninput_like}/> 
-                    </label>				
+
+                let elem_input = html! { <input class="textbox" type="text" name="value" value={v.clone()} onchange={oninput_like} list={crit.field.clone()}/> };
+
+                let drop = metadata.column_dropdown.get(&crit.field);
+                log::debug!("drop {:?}", drop);
+
+                if let Some(list_dropdown) = metadata.column_dropdown.get(&crit.field) {
+
+                    html! {
+                        <label>
+                            {" Is: "}
+                            { elem_input }
+                            <datalist id={crit.field.clone()}>
+                            {
+                                list_dropdown.iter().map(|val| { 
+                                    html!{
+                                        <option value={val.clone()} />  
+                                    }
+                                }).collect::<Html>()
+                            }
+                            </datalist>
+                        </label>				
+                    }
+
+                } else {
+                    html! {
+                        <label>
+                            {" Is: "}
+                            { elem_input }
+                        </label>				
+                    }
+
                 }
             }
-
-            
         };
 
 
@@ -85,7 +98,7 @@ impl Model {
                 </button>
 				<select class="columndrop" name="selectfield" onchange={onchange_field}>
                     {
-                        metadata.columns.keys().clone().into_iter().map(|col| { /////////////////////////////////////////////// check why so much cloning needed
+                        metadata.columns.keys().clone().into_iter().filter(|col| !col.starts_with("mapcol_")).map(|col| { /////////////////////////////////////////////// check why so much cloning needed
                             html!{
                                 <option value={col.clone()} selected={*col == crit.field}>  //////  selected="selected"  if the one
                                     { col.clone() }

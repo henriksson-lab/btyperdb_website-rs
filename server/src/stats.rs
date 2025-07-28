@@ -53,3 +53,32 @@ pub fn query_histogram(
     Ok(outlist)
 }
 
+
+
+
+
+////////////////////////////////////////////////////////////
+/// 
+pub fn query_dropdown(
+    conn: &Connection,
+    colname: &String
+) -> Result<Vec<String>> {
+
+    let mut stmt = conn.prepare(format!("SELECT distinct `{}` as grp FROM straindata ORDER BY grp", colname).as_str())?; ////////// TODO: escape name of column?
+
+    let cnts = stmt.query_map([], |row| {
+        let name:String = row.get(0)?;
+        Ok(name)
+    })?;
+
+    let mut outlist=Vec::new();
+    for name_cnt in cnts {
+        if let Ok(name_cnt) = name_cnt {
+            outlist.push(name_cnt);
+        }
+    }
+
+    //println!("{:?}",outlist);
+
+    Ok(outlist)
+}
