@@ -1,7 +1,7 @@
 use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
-use std::io::{BufReader, Cursor};
+use std::io::BufReader;
 
 use actix_files::Files;
 use actix_web::{web, web::Data, App, HttpResponse, HttpServer};

@@ -1,8 +1,6 @@
 use std::collections::HashSet;
 use std::io::Cursor;
 
-use anyhow::Result;
-
 use my_web_app::ComparisonType;
 use my_web_app::DatabaseMetadata;
 use my_web_app::StrainRequest;
@@ -14,20 +12,15 @@ use geojson::GeoJson;
 
 
 use web_sys::window;
-use yew::format::Binary;
+//use yew::format::Binary;
 use yew::{
-    format::{Json, Nothing},
+  //  format::{Json, Nothing},
     prelude::*,
-    services::{
+    /*services::{
         fetch::{FetchTask, Request, Response},
         FetchService,
-    },
+    },*/
 };
-
-//use crate::download::download_fasta;
-//use crate::download::download_metadata;
-
-use crate::download::*;
 
 ////////////////////////////////////////////////////////////
 /// Which page is currently being shown?
@@ -64,7 +57,7 @@ pub enum Msg {
     SetDatabaseMetadata(DatabaseMetadata),
     FetchDatabaseMetadata,
 
-    ChangedSearchFieldType(usize, ChangeData),
+    ChangedSearchFieldType(usize, String),
     ChangedSearchFieldFrom(usize, String),
     ChangedSearchFieldTo(usize, String),
     ChangedSearchFieldLike(usize, String),
@@ -82,13 +75,12 @@ pub enum Msg {
 ////////////////////////////////////////////////////////////
 /// State of the page
 pub struct Model {
-    pub link: ComponentLink<Self>,
     pub current_page: CurrentPage,
     pub tabledata: Option<TableData>,
     pub tabledata_from: usize,
 
-    pub task: Option<FetchTask>, ///////////// why do we keep this?
-    pub download_task: Option<FetchTask>, ///////////// why do we keep this?
+    //pub task: Option<FetchTask>, ///////////// why do we keep this?
+    //pub download_task: Option<FetchTask>, ///////////// why do we keep this?
         
     pub show_search_controls: bool,
     pub search_settings: SearchSettings,
@@ -104,36 +96,27 @@ impl Component for Model {
 
     type Properties = ();
 
+
     ////////////////////////////////////////////////////////////
     /// Create a new component
-    fn create(_props: Self::Properties, link: ComponentLink<Self>) -> Self {
-
-
+    fn create(ctx: &Context<Self>) -> Self {
 
         let geojson = GeoJson::from_reader(Cursor::new(include_bytes!("custom.geo.json"))).unwrap();
 
-        //https://docs.rs/geojson/latest/geojson/
-
-        
-
-
-        //let geojson = geojson_str.parse::<GeoJson>().unwrap();
-
-
         // For testing
-        let tabledata:TableData = serde_json::from_reader(Cursor::new(include_bytes!("testdata.json"))).unwrap();
+        //let tabledata:TableData = serde_json::from_reader(Cursor::new(include_bytes!("testdata.json"))).unwrap();
 
-        // For testing
-        //let tablemeta:DatabaseMetadata = serde_json::from_reader(Cursor::new(include_bytes!("testmeta.json"))).unwrap();
+        //Get metadata about database right away
+        //ex from https://github.com/yewstack/yew/blob/master/examples/async_clock/src/main.rs
+        ctx.link().send_message(Msg::FetchDatabaseMetadata);
 
-        let mut comp = Self {
-            link,
+        Self {
             current_page: CurrentPage::Home,
-            tabledata: Some(tabledata), //None,
+            tabledata: None, //Some(tabledata), //None,
             tabledata_from: 0,
             
-            task: None,
-            download_task: None,
+            //task: None,
+            //download_task: None,
 
             show_search_controls: true,
             search_settings: SearchSettings::new(),
@@ -141,12 +124,7 @@ impl Component for Model {
             geojson: geojson,
 
             selected_strains: HashSet::new(),
-        };
-
-        //Get metadata about database right away
-        comp.update(Msg::FetchDatabaseMetadata);
-
-        comp
+        }
     }
 
 
@@ -154,7 +132,7 @@ impl Component for Model {
 
     ////////////////////////////////////////////////////////////
     /// Handle an update message
-    fn update(&mut self, msg: Self::Message) -> ShouldRender {
+    fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
         match msg {
 
             Msg::OpenPage(page) => {
@@ -165,26 +143,22 @@ impl Component for Model {
 
             Msg::StartQuery => {
                 let json = serde_json::to_string(&self.search_settings).expect("Failed to generate json");
-
                 //log::debug!("sending {}", json);
+                async fn get_data(json: String) -> Msg {
+                    let client = reqwest::Client::new();
+                    let res: TableData = client.post("http://localhost:8080/straindata")
+                        .header("Content-Type", "application/json")
+                        .body(json)
+                        .send()
+                        .await
+                        .expect("Failed to send request")
+                        .json()
+                        .await
+                        .expect("Failed to get table data");
+                    Msg::SetQuery(Some(res))
+                }
 
-                //let request = Request::get("/straindata") /////////// do post instead
-                let request = Request::post("/straindata")
-                    .header("Content-Type", "application/json")
-//                    .body(Json(&json))  //do not use!! escapes the data resulting in error 400
-                    .body(Ok(json))
-                    .expect("Could not build request");
-                let callback =
-                    self.link.callback(|response: Response<Json<Result<TableData>>>| {
-                        //log::debug!("{:?}", response);
-                        let Json(data) = response.into_body();
-                        Msg::SetQuery(data.ok())
-                    });
-                let task = FetchService::fetch(
-                    request, 
-                    callback).expect("Failed to start request");
-                //store the task so it isn't canceled immediately
-                self.task = Some(task);
+                ctx.link().send_future(get_data(json));
                 false
             }
 
@@ -193,19 +167,22 @@ impl Component for Model {
 
 
             Msg::FetchDatabaseMetadata => {
-                //Ask the server for metadata
-                let request = Request::get("/strainmeta")
-                        .body(Nothing)
-                        .expect("Could not build request");                        
-                let callback =
-                    self.link
-                        .callback(|response: Response<Json<Result<DatabaseMetadata>>>| {
-                            //log::debug!("got metadata {:?}", response);
-                            let Json(data) = response.into_body();
-                            Msg::SetDatabaseMetadata(data.ok().expect("metadata fail"))
-                        });
-                let task = FetchService::fetch(request, callback).expect("Failed to start request");
-                self.task = Some(task);
+                async fn get_data() -> Msg {
+                    let client = reqwest::Client::new();
+                    let res: DatabaseMetadata = client.get("http://localhost:8080/strainmeta")
+                        .header("Content-Type", "application/json")
+                        .body("")
+                        //no body
+                        .send()
+                        .await
+                        .expect("Failed to send request")
+                        .json()
+                        .await
+                        .expect("Failed to get metadata");
+                    Msg::SetDatabaseMetadata(res)
+                }
+
+                ctx.link().send_future(get_data());
                 false
             }
 
@@ -262,23 +239,12 @@ impl Component for Model {
 
 
             Msg::ChangedSearchFieldType(i, val) => {
-                if let ChangeData::Select(d) = val {
-                    let val = d.value();
+                let crit = self.search_settings.criteria.get_mut(i).expect("Could not get field");
+                crit.field = val;
 
-                    let crit = self.search_settings.criteria.get_mut(i).expect("Could not get field");
-                    crit.field = val;
-                    //log::debug!("set field {:?}", field);
-
-                    if let Some(db_metadata) = &self.db_metadata {
-                        let column_metadata = db_metadata.columns.get(&crit.field).expect("no column");
-                        //log::debug!("field info {:?} {:?}", crit.field, column_metadata);                        
-                        crit.comparison = ComparisonType::default_comparison(column_metadata);
-                        //log::debug!("ChangedSearchFieldType: {:?}", crit);
-                    }
-
-
-                    //todo update from-to etc
-                    //could be beneficial to do this in subcomponent; would it avoid rerendering everything?
+                if let Some(db_metadata) = &self.db_metadata {
+                    let column_metadata = db_metadata.columns.get(&crit.field).expect("no column");
+                    crit.comparison = ComparisonType::default_comparison(column_metadata);
                 }
                 true
             }
@@ -319,7 +285,6 @@ impl Component for Model {
             Msg::DownloadFASTAgot(data) => {
                 log::debug!("DownloadFASTAgot");
                 self.download_fasta(&data);
-                self.download_task=None; //Might save memory
                 false
             },
 
@@ -339,28 +304,25 @@ impl Component for Model {
 
                     let json = serde_json::to_string(&req).expect("Failed to generate json");
                     //log::debug!("sending {}", json);
-                    let bin = json.as_bytes().to_vec();
+                    //let bin = json.as_bytes().to_vec();
 
-                    //let request = Request::get("/straindata") /////////// do post instead
-                    let request = Request::post("/strainfasta")
-                        .header("Content-Type", "application/json")
-                        .body(Ok(bin))
-                        //.body(Ok(json))
-                        .expect("Could not build request");
-                    let callback =
-                        self.link.callback(|response: Response<Binary>| {
-                            //log::debug!("{:?}", response);
-                            let data = response.into_body().expect("Could not get binary data");
-                            log::debug!("Got data {}", data.len());
+                    //log::debug!("sending {}", json);
+                    async fn get_data(json: String) -> Msg {
+                        let client = reqwest::Client::new();
+                        let res = client.post("http://localhost:8080/strainfasta")
+                            .header("Content-Type", "application/json")
+                            .body(json)
+                            .send()
+                            .await
+                            .expect("Failed to send request")
+                            .bytes()
+//                            .json()
+                            .await
+                            .expect("Failed to get table data");
 
-                            Msg::DownloadFASTAgot(data)
-                            //Msg::SetQuery(data.ok())
-                        });
-                    let task = FetchService::fetch_binary(
-                        request, 
-                        callback).expect("Failed to start request");
-                    //store the task so it isn't canceled immediately
-                    self.download_task = Some(task);
+                        Msg::DownloadFASTAgot(res.to_vec())
+                    }
+                    ctx.link().send_future(get_data(json));
                 }        
                 false        
             },
@@ -394,35 +356,51 @@ impl Component for Model {
     }
 
 
-
+/*
     ////////////////////////////////////////////////////////////
     /// x
     fn change(&mut self, _props: Self::Properties) -> ShouldRender {
         false
     }
 
+ */
 
     ////////////////////////////////////////////////////////////
     /// Top renderer of the page
-    fn view(&self) -> Html {
+    fn view(&self, ctx: &Context<Self>) -> Html {
+
+        /* 
+        use yew_autocomplete::{view::Bulma, Autocomplete, ItemResolver, ItemResolverResult};
+        use yew_commons::FnProp;
+
+        let onchange = |_: Vec<String>| ();
+        let resolve_items: ItemResolver<String> =
+            FnProp::from(|_: String| -> ItemResolverResult<String>  {
+                Box::pin(async { Ok(Vec::<String>::new()) })
+            });
+
+*/
+        
+
 
         let current_page = match self.current_page { 
-            CurrentPage::Home => self.view_landing_page(),
-            CurrentPage::Search => self.view_search_pane(),
-            CurrentPage::Statistics => self.view_statistics_pane(),
-            CurrentPage::Help => self.view_help_pane(),
-            CurrentPage::About => self.view_about_pane()
+            CurrentPage::Home => self.view_landing_page(&ctx),
+            CurrentPage::Search => self.view_search_pane(&ctx),
+            CurrentPage::Statistics => self.view_statistics_pane(&ctx),
+            CurrentPage::Help => self.view_help_pane(&ctx),
+            CurrentPage::About => self.view_about_pane(&ctx)
         };
+
 
         let html_top_buttons = html! {
             <header class="App-header">
                 <div id="topmenu" class="topnav">
                     <div class="topnav-right">
-                        <a class=active_if(self.current_page==CurrentPage::Home)       onclick=self.link.callback(|_| Msg::OpenPage(CurrentPage::Home))>{"Home"}</a>
-                        <a class=active_if(self.current_page==CurrentPage::Search)     onclick=self.link.callback(|_| Msg::OpenPage(CurrentPage::Search))>{"Search"}</a>
-                        <a class=active_if(self.current_page==CurrentPage::Statistics) onclick=self.link.callback(|_| Msg::OpenPage(CurrentPage::Statistics))>{"Statistics"}</a>
-                        <a class=active_if(self.current_page==CurrentPage::Help)       onclick=self.link.callback(|_| Msg::OpenPage(CurrentPage::Help))>{"Help"}</a>
-                        <a class=active_if(self.current_page==CurrentPage::About)      onclick=self.link.callback(|_| Msg::OpenPage(CurrentPage::About))>{"About"}</a>
+                        <a class={active_if(self.current_page==CurrentPage::Home)}       onclick={ctx.link().callback(|_| Msg::OpenPage(CurrentPage::Home))}>{"Home"}</a> 
+                        <a class={active_if(self.current_page==CurrentPage::Search)}     onclick={ctx.link().callback(|_| Msg::OpenPage(CurrentPage::Search))}>{"Search"}</a>
+                        <a class={active_if(self.current_page==CurrentPage::Statistics)} onclick={ctx.link().callback(|_| Msg::OpenPage(CurrentPage::Statistics))}>{"Statistics"}</a>
+                        <a class={active_if(self.current_page==CurrentPage::Help)}       onclick={ctx.link().callback(|_| Msg::OpenPage(CurrentPage::Help))}>{"Help"}</a>
+                        <a class={active_if(self.current_page==CurrentPage::About)}      onclick={ctx.link().callback(|_| Msg::OpenPage(CurrentPage::About))}>{"About"}</a>
                     </div>
                 </div>
             </header>        
@@ -432,6 +410,15 @@ impl Component for Model {
             <div>
                 { html_top_buttons }
                 { current_page }
+/* 
+                <Autocomplete<String> 
+                    resolve_items={resolve_items}
+                    onchange={onchange}
+                    auto = false
+                >
+                    <Bulma<String> />
+                </Autocomplete<String>>
+*/
             </div>
         }
     }
@@ -466,3 +453,6 @@ pub fn alert(s: &str) {
     let window = window().expect("no window");
     window.alert_with_message(s).unwrap();
 }
+
+
+// https://yew.rs/docs/next/advanced-topics/struct-components/hoc

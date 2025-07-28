@@ -48,7 +48,7 @@ pub fn query_histogram(
         }
     }
 
-    println!("{:?}",outlist);
+    //println!("{:?}",outlist);
 
     Ok(outlist)
 }

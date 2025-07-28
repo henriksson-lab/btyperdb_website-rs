@@ -9,7 +9,7 @@ impl Model {
 
     ////////////////////////////////////////////////////////////
     /// Page: Help
-    pub fn view_help_pane(&self) -> Html {
+    pub fn view_help_pane(&self, _ctx: &Context<Self>) -> Html {
         html! {
             <div>
             <div class="App-divider">{"Help"}</div>
@@ -20,7 +20,7 @@ impl Model {
                 <p>
                     {"Help will be written here in the near future!"}
                 </p>
-                {"&nbsp;"}
+                {""}
                 
             </div>
             <br />

@@ -1,16 +1,17 @@
 
-
+### to install tools
 cargo install cargo-watch
 cargo install trunk
 rustup target add wasm32-unknown-unknown
 
-cd app; trunk watch #cargo build
 
-#cd src; cargo build
+#### In one terminal
+cd app; trunk watch 
 
+#### In another terminal
 cargo watch -w server -w src -x "run"
 
 
-#unsure of order. app first?
 
+#### To run on server
 cargo run

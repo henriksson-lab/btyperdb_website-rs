@@ -22,7 +22,7 @@ impl Model {
 
     ////////////////////////////////////////////////////////////
     /// x
-    pub fn view_landing_page(&self) -> Html {
+    pub fn view_landing_page(&self, ctx: &Context<Self>) -> Html {
 
         let num_strain = if let Some(metadata) = &self.db_metadata {
             format!("{}", metadata.num_strain)
@@ -52,7 +52,7 @@ impl Model {
                     {num_strain} {" total B. cereus group genomes with curated metadata"}
                 </p>
 
-                <button class="toolbutton" onclick=self.link.callback(|_| Msg::OpenPage(CurrentPage::Search))>
+                <button class="toolbutton" onclick={ctx.link().callback(|_| Msg::OpenPage(CurrentPage::Search))}>
                     {"Search BTyperDB"}
                 </button>
 

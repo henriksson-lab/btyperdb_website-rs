@@ -1,6 +1,4 @@
-all:
-	cargo watch -w server -w src -x "run"
-	#https://github.com/sacovo/actix-yew-template
-
-2:
+1:
 	cd app; trunk watch
+2:
+	cargo watch -w server -w src -x "run"

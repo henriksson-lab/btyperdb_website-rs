@@ -1,6 +1,8 @@
 use crate::core_model::*;
+use wasm_bindgen::JsCast;
 
 use my_web_app::{ComparisonType, DatabaseMetadata};
+use web_sys::{EventTarget, HtmlInputElement};
 use yew::{
     prelude::*,
 };
@@ -9,25 +11,40 @@ impl Model {
 
     ////////////////////////////////////////////////////////////
     /// One of the search fields
-    pub fn view_search_line(&self, metadata: &DatabaseMetadata, i: usize) -> Html {
+    pub fn view_search_line(&self, ctx: &Context<Self>, metadata: &DatabaseMetadata, i: usize) -> Html {
 
         let crit = self.search_settings.criteria.get(i).unwrap();
-        
+
         //meah https://yew.rs/docs/concepts/html/events
         // check https://docs.rs/yew-components/latest/src/yew_components/select.rs.html
 
-        let onchange_field = self.link.callback(move |e: ChangeData | {
-            Msg::ChangedSearchFieldType(i, e)
+        let onchange_field = Callback::from(move |e: Event | {
+            let target: Option<EventTarget> = e.target();
+            let input = target.and_then(|t| t.dyn_into::<HtmlInputElement>().ok());
+            if let Some(input) = input {
+                Msg::ChangedSearchFieldType(i, input.value());
+            }
         });
-        // batch_callback  use instead
-        let oninput_from = self.link.callback(move |e: InputData | {
-            Msg::ChangedSearchFieldFrom(i, e.value)
+        let oninput_from = Callback::from(move |e: Event | {
+            let target: Option<EventTarget> = e.target();
+            let input = target.and_then(|t| t.dyn_into::<HtmlInputElement>().ok());
+            if let Some(input) = input {
+                Msg::ChangedSearchFieldFrom(i, input.value());
+            }
         });
-        let oninput_to = self.link.callback(move |e: InputData | {
-            Msg::ChangedSearchFieldTo(i, e.value)
+        let oninput_to = Callback::from(move |e: Event | {
+            let target: Option<EventTarget> = e.target();
+            let input = target.and_then(|t| t.dyn_into::<HtmlInputElement>().ok());
+            if let Some(input) = input {
+                Msg::ChangedSearchFieldTo(i, input.value());
+            }
         });
-        let oninput_like = self.link.callback(move |e: InputData | {
-            Msg::ChangedSearchFieldLike(i, e.value)
+        let oninput_like = Callback::from(move |e: Event | {
+            let target: Option<EventTarget> = e.target();
+            let input = target.and_then(|t| t.dyn_into::<HtmlInputElement>().ok());
+            if let Some(input) = input {
+                Msg::ChangedSearchFieldLike(i, input.value());
+            }
         });
         
         //log::debug!("render {:?}",crit);
@@ -42,9 +59,9 @@ impl Model {
                 html! {
                     <label>
                         {" From: "}
-                        <input class="textbox" type="text" name="value1" value={from.clone()} oninput={oninput_from}/> 
+                        <input class="textbox" type="text" name="value1" value={from.clone()} onchange={oninput_from}/> 
                         {" To: "}
-                        <input class="textbox" type="text" name="value2" value={to.clone()} oninput={oninput_to}/>
+                        <input class="textbox" type="text" name="value2" value={to.clone()} onchange={oninput_to}/>
                     </label>				
                 }
             },
@@ -52,7 +69,7 @@ impl Model {
                 html! {
                     <label>
                         {" Is: "}
-                        <input class="textbox" type="text" name="value" value={v.clone()} oninput={oninput_like}/> 
+                        <input class="textbox" type="text" name="value" value={v.clone()} onchange={oninput_like}/> 
                     </label>				
                 }
             }
@@ -63,7 +80,7 @@ impl Model {
 
         html! {
 			<div class="divSearchField">
-				<button name="bDelete" class="buttonspacer" onclick=self.link.callback(move |_| Msg::DeleteSearchFilter(i))>
+				<button name="bDelete" class="buttonspacer" onclick={ctx.link().callback(move |_| Msg::DeleteSearchFilter(i))}>
                     {"X"}
                 </button>
 				<select class="columndrop" name="selectfield" onchange={onchange_field}>
@@ -87,7 +104,7 @@ impl Model {
 
     ////////////////////////////////////////////////////////////
     /// Page: Search
-    pub fn view_search_pane(&self) -> Html {
+    pub fn view_search_pane(&self, ctx: &Context<Self>) -> Html {
 
         let search_controls = if let Some(metadata) = &self.db_metadata {
 
@@ -98,14 +115,14 @@ impl Model {
                     <div>
                         {
                             (0..self.search_settings.criteria.len()).into_iter().map(|i| { 
-                                html!{  self.view_search_line(metadata, i)  }
+                                html!{  self.view_search_line(&ctx, metadata, i)  }
                             }).collect::<Html>()
                         }
                         <div>                        
-                            <button class="buttonspacer" onclick=self.link.callback(|_| Msg::AddSearchFilter)>
+                            <button class="buttonspacer" onclick={ctx.link().callback(|_| Msg::AddSearchFilter)}>
                                 {"Add filter"}
                             </button>
-                            <button class="buttonspacer" onclick=self.link.callback(|_| Msg::StartQuery)>
+                            <button class="buttonspacer" onclick={ctx.link().callback(|_| Msg::StartQuery)}>
                                 {"Search"}
                             </button>
                         </div>
@@ -125,27 +142,27 @@ impl Model {
             <div>
                 <div class="App-divider">
                     {"Search for genomes"}                
-                    <button class="toggleview" onclick=self.link.callback(move |_| Msg::SetSearchControlVisibility(!visibility))>
+                    <button class="toggleview" onclick={ctx.link().callback(move |_| Msg::SetSearchControlVisibility(!visibility))}>
                         { if self.show_search_controls { html!{"Hide panel"} } else { html!{"Show panel"} } }  
                     </button>
                 </div>
 
                 { if self.show_search_controls { search_controls } else { html!{""} } }  
 
-                { self.view_table() }
+                { self.view_table(&ctx) }
 
                 <div class="downloadnav">
-                    <button class="buttonspacer" onclick={self.link.callback(move |_e | {Msg::DownloadFASTA(IncludeData::Selected)})}>
+                    <button class="buttonspacer" onclick={ctx.link().callback(move |_e | {Msg::DownloadFASTA(IncludeData::Selected)})}>
                         {"FASTA: Download selected"}
                     </button>
-                    <button class="buttonspacer" onclick={self.link.callback(move |_e | {Msg::DownloadFASTA(IncludeData::All)})}>
+                    <button class="buttonspacer" onclick={ctx.link().callback(move |_e | {Msg::DownloadFASTA(IncludeData::All)})}>
                         {"FASTA: Download all"}
                     </button>
 
-                    <button class="buttonspacer" onclick={self.link.callback(move |_e | {Msg::DownloadMetadata(IncludeData::Selected)})}>
+                    <button class="buttonspacer" onclick={ctx.link().callback(move |_e | {Msg::DownloadMetadata(IncludeData::Selected)})}>
                         {"Metadata: Download selected"}
                     </button>
-                    <button class="buttonspacer" onclick={self.link.callback(move |_e | {Msg::DownloadMetadata(IncludeData::All)})}>
+                    <button class="buttonspacer" onclick={ctx.link().callback(move |_e | {Msg::DownloadMetadata(IncludeData::All)})}>
                         {"Metadata: Download all"}
                     </button>
                 </div>

@@ -8,7 +8,7 @@ impl Model {
 
     ////////////////////////////////////////////////////////////
     /// x
-    pub fn view_about_pane(&self) -> Html {
+    pub fn view_about_pane(&self, _ctx: &Context<Self>) -> Html {
 
         html! {
             <div>

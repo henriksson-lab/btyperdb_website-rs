@@ -14,5 +14,5 @@ use crate::core_model::*;
 /// x
 fn main() {
     wasm_logger::init(wasm_logger::Config::default());
-    yew::start_app::<Model>();
+    yew::Renderer::<Model>::new().render();
 }
