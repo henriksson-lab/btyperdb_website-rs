@@ -1,8 +1,6 @@
 use crate::core_model::*;
 
-use yew::{
-    prelude::*,
-};
+use yew::prelude::*;
 
 
 ////////////////////////////////////////////////////////////

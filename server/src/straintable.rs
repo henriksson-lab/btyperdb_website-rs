@@ -11,12 +11,10 @@ use my_web_app::TableData;
 use my_web_app::DatabaseColumn;
 use my_web_app::DatabaseMetadata;
 
-extern crate rusqlite;
 use rusqlite::types::ValueRef;
 use rusqlite::{Connection, Result};
 
 use crate::ServerData;
-
 use crate::escaping::*;
 use crate::stats::*;
 

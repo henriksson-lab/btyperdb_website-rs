@@ -1,3 +1,8 @@
+pub mod zip;
+pub mod stats;
+pub mod escaping;
+pub mod straintable;
+
 use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
@@ -5,26 +10,14 @@ use std::io::BufReader;
 
 use actix_files::Files;
 use actix_web::{web, web::Data, App, HttpResponse, HttpServer};
-
-use my_web_app::DatabaseMetadata;
-
-extern crate rusqlite;
 use rusqlite::OpenFlags;
 use rusqlite::{Connection};
-
-pub mod zip;
 use serde::Deserialize;
 use serde::Serialize;
-use zip::*;
 
-pub mod stats;
-//use stats::*;
-
-pub mod escaping;
-//use escaping::*;
-
-pub mod straintable;
+use my_web_app::DatabaseMetadata;
 use straintable::*;
+use zip::*;
 
 ////////////////////////////////////////////////////////////
 /// Backend state

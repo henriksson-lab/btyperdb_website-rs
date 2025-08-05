@@ -2,10 +2,7 @@ use std::collections::HashMap;
 
 use geojson::GeoJson;
 use geojson::{Geometry, Value};
-
-use yew::{
-    prelude::*,
-};
+use yew::prelude::*;
 
 
 ////////////////////////////////////////////////////////////

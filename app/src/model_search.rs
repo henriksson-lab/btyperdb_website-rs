@@ -3,9 +3,7 @@ use wasm_bindgen::JsCast;
 
 use my_web_app::{ComparisonType, DatabaseMetadata};
 use web_sys::{EventTarget, HtmlInputElement, HtmlSelectElement};
-use yew::{
-    prelude::*,
-};
+use yew::prelude::*;
 
 impl Model {
 

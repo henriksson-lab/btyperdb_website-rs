@@ -12,15 +12,7 @@ use geojson::GeoJson;
 
 
 use web_sys::window;
-//use yew::format::Binary;
-use yew::{
-  //  format::{Json, Nothing},
-    prelude::*,
-    /*services::{
-        fetch::{FetchTask, Request, Response},
-        FetchService,
-    },*/
-};
+use yew::prelude::*;
 
 ////////////////////////////////////////////////////////////
 /// Which page is currently being shown?
