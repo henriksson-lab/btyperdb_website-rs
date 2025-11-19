@@ -97,11 +97,7 @@ impl Component for Model {
 
         let geojson = GeoJson::from_reader(Cursor::new(include_bytes!("custom.geo.json"))).unwrap();
 
-        // For testing
-        //let tabledata:TableData = serde_json::from_reader(Cursor::new(include_bytes!("testdata.json"))).unwrap();
-
         //Get metadata about database right away
-        //ex from https://github.com/yewstack/yew/blob/master/examples/async_clock/src/main.rs
         ctx.link().send_message(Msg::FetchDatabaseMetadata);
 
         Self {
@@ -354,7 +350,6 @@ impl Component for Model {
                             .await
                             .expect("Failed to send request")
                             .bytes()
-//                            .json()
                             .await
                             .expect("Failed to get table data");
 
@@ -475,7 +470,8 @@ pub fn alert(s: &str) {
     window.alert_with_message(s).unwrap();
 }
 
-
+////////////////////////////////////////////////////////////
+/// 
 pub fn get_host_url() -> String {
     let document = window().expect("no window").document().expect("no document on window");
     let location = document.location().expect("no location");
@@ -487,4 +483,3 @@ pub fn get_host_url() -> String {
     url
 }
 
-// https://yew.rs/docs/next/advanced-topics/struct-components/hoc

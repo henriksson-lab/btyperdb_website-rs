@@ -14,29 +14,27 @@ impl Model {
 
         let html_stats = if let Some(db_metadata) = &self.db_metadata {
 
+            //Make a list of all stats shown as bars
+            let mut list_stats_vec = Vec::new();
+            for onestats in &db_metadata.list_hist {
+                list_stats_vec.push(
+                    html! {
+                        <div>
+                            {onestats.name.clone()}
+                            { svg_horizontal_bar_fractions(&onestats.hist) }
+                        </div>
+                    }
+                );
+            }
+
             html! { 
-                <p>
+                <p class="commontext">
                     <div style="width:40%;margin: auto;">
                         {"Number of genomes per country"}
                         { GeoMapView::draw_geojson(&self.geojson, &db_metadata.hist_country) }
                     </div>
-                    <div>
-                        {"GTDB species"}
-                        { svg_horizontal_bar_fractions(&db_metadata.hist_gtdb_species) }
-                    </div>
-                    <div>
-                        {"Isolation source (Source 1)"}
-                        { svg_horizontal_bar_fractions(&db_metadata.hist_source1) }
-                    </div>
-                    <div>
-                        {"Human illness"}
-                        { svg_horizontal_bar_fractions(&db_metadata.hist_humanillness) }
-                    </div>
-                    <div>
-                        {"BTyper3 adjusted panC group"}
-                        { svg_horizontal_bar_fractions(&db_metadata.hist_pancgroup) }
-                    </div>
 
+                    {list_stats_vec}
                 </p>
             }
 

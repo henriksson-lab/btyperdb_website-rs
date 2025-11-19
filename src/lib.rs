@@ -1,5 +1,5 @@
 use std::collections::BTreeMap;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, Serializer, de};
 
 type DatabaseHistogram = Vec<(String,i32)>;
 
@@ -12,6 +12,13 @@ pub struct TableData {
     pub rows: Vec<Vec<String>>,
 }
 
+////////////////////////////////////////////////////////////
+/// Metadata about strain columns
+#[derive(Debug, Deserialize, Serialize)]
+pub struct OneStats {
+    pub name: String,
+    pub hist: DatabaseHistogram,
+}
 
 
 ////////////////////////////////////////////////////////////
@@ -22,13 +29,8 @@ pub struct DatabaseMetadata {
     pub columns: BTreeMap<String, DatabaseColumn>,
     pub column_dropdown: BTreeMap<String, Vec<String>>,
 
-    pub hist_humanillness: DatabaseHistogram,
-    pub hist_source1: DatabaseHistogram,
-    pub hist_pancgroup: DatabaseHistogram,
-    pub hist_gtdb_species: DatabaseHistogram,
-    pub hist_country: DatabaseHistogram,
-
-    
+    pub list_hist: Vec<OneStats>,
+    pub hist_country: DatabaseHistogram,   
 }
 impl DatabaseMetadata {
     pub fn new() -> DatabaseMetadata {
@@ -36,13 +38,8 @@ impl DatabaseMetadata {
             num_strain: -1,
             columns: BTreeMap::new(),
             column_dropdown: BTreeMap::new(),
-
-            hist_humanillness: Vec::new(),
-            hist_source1: Vec::new(),
-            hist_pancgroup: Vec::new(),
-            hist_gtdb_species: Vec::new(),
+            list_hist: Vec::new(),
             hist_country: Vec::new(),
-
         }
     }
 }
@@ -57,18 +54,50 @@ pub struct DatabaseColumn {
     pub default_v1: String,	
     pub default_v2: String,	
     pub default_show_column: String,
-    pub dropdown: String, 
-    pub display: String,
-    pub search: String,
-    pub print: String,
+
+    #[serde(deserialize_with = "deserialize_01bool", serialize_with = "serialize_01bool")]
+    pub dropdown: bool, 
+    #[serde(deserialize_with = "deserialize_01bool", serialize_with = "serialize_01bool")]
+    pub display: bool,
+    #[serde(deserialize_with = "deserialize_01bool", serialize_with = "serialize_01bool")]
+    pub search: bool,
+    #[serde(deserialize_with = "deserialize_01bool", serialize_with = "serialize_01bool")]
+    pub print: bool,
+    
     pub notes: String,
+}
+
+
+fn deserialize_01bool<'de, D>(deserializer: D) -> Result<bool, D::Error>
+where
+    D: de::Deserializer<'de>,
+{
+    let s: &str = de::Deserialize::deserialize(deserializer)?;
+
+    match s {
+        "1" => Ok(true),
+        "0" => Ok(false),
+        _ => Err(de::Error::unknown_variant(s, &["1", "0"])),
+    }
+}
+
+
+fn serialize_01bool<S>(x: &bool, s: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    if *x {
+        s.serialize_str("1")
+    } else {
+        s.serialize_str("0")
+    }
 }
 
 
 
 
-
-
+////////////////////////////////////////////////////////////
+/// 
 #[derive(Debug, Serialize, Deserialize, Eq, PartialEq, Clone)]
 pub struct StrainRequest {
     pub list: Vec<String>
@@ -77,6 +106,8 @@ pub struct StrainRequest {
 
 
 
+////////////////////////////////////////////////////////////
+/// 
 #[derive(Debug, Serialize, Deserialize, Eq, PartialEq, Clone)]
 pub struct SearchSettings {
     pub criteria: Vec<SearchCriteria>
@@ -94,6 +125,8 @@ impl SearchSettings {
     }
 }
 
+////////////////////////////////////////////////////////////
+/// 
 #[derive(Debug, Serialize, Deserialize, Eq, PartialEq, Clone)]
 pub struct SearchCriteria {
     pub field: String,
@@ -109,6 +142,8 @@ impl SearchCriteria {
 }
 
 
+////////////////////////////////////////////////////////////
+/// 
 #[derive(Debug, Serialize, Deserialize, Eq, PartialEq, Clone)]
 pub enum ComparisonType {
     Like(String),

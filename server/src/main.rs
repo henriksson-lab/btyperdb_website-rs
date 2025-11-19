@@ -52,8 +52,6 @@ async fn main() -> std::io::Result<()> {
     let config_reader = BufReader::new(f_meta);
     let config_file:ConfigFile = serde_json::from_reader(config_reader).expect("Could not open config file");
 
-    
-
     // Open SQL database
     let path_store = Path::new(&config_file.store);
     let path_sql = path_store.join(Path::new("meta/data.sqlite"));
@@ -66,7 +64,7 @@ async fn main() -> std::io::Result<()> {
     let db_metadata = read_database_metadata(
         reader,
         &conn
-    );
+    ).expect("Failed to read database meta");
 
     let data = Data::new(Mutex::new(
         ServerData {

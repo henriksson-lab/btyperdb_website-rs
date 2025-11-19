@@ -75,7 +75,7 @@ impl Model {
 
                         //Shorten column text if needed
                         let txt_html = if txt.len() > max_text_len {
-                            html!{ <span title={txt.clone()}> {txt[0..max_text_len].to_string()} {"..."}</span> }
+                            html!{ <span title={txt.clone()}> {txt[0..max_text_len].to_string()} {"..."}</span> }  // NOTE: dangerous to have a class on span directly!!!!!!
                         } else {
                             html!{ {txt} }
                         };
@@ -94,7 +94,7 @@ impl Model {
                         } else {
                             txt_html
                         };
-                        html!{<td key={*i} style="background: #EEEEEE; padding: 1px;"> {txt_link} </td>}
+                        html!{<td key={*i} class="tablecontent"> {txt_link} </td>}
                     }).collect::<Html>()
                 }
             </tr>
@@ -180,9 +180,9 @@ impl Model {
                                 //Generate HTML for column header
                                 let pretty_txt = str::replace(txt, "_", " ");
                                 html!{
-                                    <th key={*i}  style="background: #CCFFFF; padding: 1px;"> 
+                                    <th key={*i} class="tableheader"> 
                                         {pretty_txt} 
-                                        <button onclick={remove_onclick}>{"X"}</button>
+                                        <button onclick={remove_onclick} class="hidecolumnbutton">{"X"}</button>
                                     </th>
                                 }
                             }).collect::<Html>()

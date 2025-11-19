@@ -13,9 +13,6 @@ impl Model {
 
         let crit = self.search_settings.criteria.get(i).unwrap();
 
-        //meah https://yew.rs/docs/concepts/html/events
-        // check https://docs.rs/yew-components/latest/src/yew_components/select.rs.html
-
         let onchange_field = ctx.link().callback(move |e: Event | {
             let target: Option<EventTarget> = e.target();
             let input = target.and_then(|t| t.dyn_into::<HtmlSelectElement>().ok()).expect("wrong type");
@@ -40,6 +37,7 @@ impl Model {
             Msg::ChangedSearchFieldLike(i, input.value())
         });
 
+        //Generate different controls depending on what type of comparison will be made
         let html_values = match &crit.comparison {
             ComparisonType::FromTo(from,to) => {
                 html! {
@@ -55,8 +53,8 @@ impl Model {
 
                 let elem_input = html! { <input class="textbox" type="text" name="value" value={v.clone()} onchange={oninput_like} list={crit.field.clone()}/> };
 
-                let drop = metadata.column_dropdown.get(&crit.field);
-                log::debug!("drop {:?}", drop);
+                //let drop = metadata.column_dropdown.get(&crit.field);
+                //log::debug!("drop {:?}", drop);
 
                 if let Some(list_dropdown) = metadata.column_dropdown.get(&crit.field) {
 
@@ -88,22 +86,28 @@ impl Model {
             }
         };
 
+        //Figure out which fields we can search
+        let mut list_select_options = Vec::new();
+        for (colname,colmeta) in &metadata.columns {
+            if colmeta.display {
+                list_select_options.push(
+                    html!{
+                        <option value={colname.clone()} selected={*colname == crit.field}>
+                            { colname.replace("_", " ") }
+                        </option>
+                    }
+                );
+            }
+        }
 
+        //HTML: all elements together
         html! {
 			<div class="divSearchField">
 				<button name="bDelete" class="buttonspacer" onclick={ctx.link().callback(move |_| Msg::DeleteSearchFilter(i))}>
                     {"X"}
                 </button>
 				<select class="columndrop" name="selectfield" onchange={onchange_field}>
-                    {
-                        metadata.columns.keys().clone().into_iter().filter(|col| !col.starts_with("mapcol_")).map(|col| { /////////////////////////////////////////////// check why so much cloning needed
-                            html!{
-                                <option value={col.clone()} selected={*col == crit.field}>  //////  selected="selected"  if the one
-                                    { col.clone() }
-                                </option>
-                            }
-                        }).collect::<Html>()
-                    }
+                    {list_select_options}
 				</select>
                 { html_values }
 			</div>
@@ -134,9 +138,9 @@ impl Model {
             });
             if let Some(db_metadata) = &self.db_metadata {
                 for (colname,colmeta) in &db_metadata.columns {
-                    if colmeta.display=="1" && !self.show_columns.contains(colname){ // starts_with("matchcol_")
+                    if colmeta.display && !self.show_columns.contains(colname){
                         list_colstoadd.push(html! {
-                            <option>{colname}</option>
+                            <option>{colname.replace("_"," ")}</option>
                         });
                     }
                 }
@@ -149,6 +153,7 @@ impl Model {
                     </div>
                     <div>
                         {
+                            //List of filters
                             (0..self.search_settings.criteria.len()).into_iter().map(|i| { 
                                 html!{  self.view_search_line(&ctx, metadata, i)  }
                             }).collect::<Html>()
@@ -161,7 +166,9 @@ impl Model {
                                 {"Search"}
                             </button>
                             
-                            {"Add column to show: "}
+                            <span class="commontext">
+                                {"Add column to show: "}
+                            </span>
                             <select class="columndrop" onchange={onchange_addcolumn}>
                                 {list_colstoadd}
                             </select>                            
@@ -203,14 +210,14 @@ impl Model {
                         {"FASTA: Download selected"}
                     </button>
                     <button class="buttonspacer" onclick={ctx.link().callback(move |_e | {Msg::DownloadFASTA(IncludeData::All)})}>
-                        {"FASTA: Download all"}
+                        {"FASTA: Download displayed"}
                     </button>
 
                     <button class="buttonspacer" onclick={ctx.link().callback(move |_e | {Msg::DownloadMetadata(IncludeData::Selected)})}>
                         {"Metadata: Download selected"}
                     </button>
                     <button class="buttonspacer" onclick={ctx.link().callback(move |_e | {Msg::DownloadMetadata(IncludeData::All)})}>
-                        {"Metadata: Download all"}
+                        {"Metadata: Download displayed"}
                     </button>
                 </div>
 

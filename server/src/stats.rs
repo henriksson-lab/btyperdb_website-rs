@@ -1,3 +1,4 @@
+use my_web_app::OneStats;
 use rusqlite::{Connection, Result};
 
 type DatabaseHistogram = Vec<(String,i32)>;
@@ -54,6 +55,19 @@ pub fn query_histogram(
 }
 
 
+
+////////////////////////////////////////////////////////////
+/// 
+pub fn make_stats(
+    conn: &Connection,
+    showname: &String,
+    colname: &String
+) -> Result<OneStats> {
+    Ok(OneStats {
+        name: showname.clone(),
+        hist: query_histogram(conn, colname)?,
+    })
+}
 
 
 

@@ -16,25 +16,50 @@ impl Model {
     pub fn make_metadata_csv(&self, list_strains: &Vec<String>) -> String {
         let mut csv = String::new();
 
-        let mut set_strains = HashSet::new();
-        for e in list_strains {
-            set_strains.insert(e);
-        }
+        if let Some(db_metadata) = &self.db_metadata {
 
-        if let Some(tabledata) = &self.tabledata {
-            csv.push_str(tabledata.columns.join("\t").as_str());
-            csv.push_str("\n");
-
-            for r in &tabledata.rows {
-                let id = r.get(0).expect("empty row");
-                if set_strains.contains(id) {
-                    csv.push_str(r.join("\t").as_str()); ///////////////////// todo: exclude those starting with matchcol_  .... TODO
-                    csv.push_str("\n");
-                }
+            let mut set_strains = HashSet::new();
+            for e in list_strains {
+                set_strains.insert(e);
             }
-        } else {
-            log::debug!("tabledata is missing");
+
+            if let Some(tabledata) = &self.tabledata {
+
+                //Decide which columns to include
+                let mut pick_col_id = Vec::new();
+                for (i,colname) in tabledata.columns.iter().enumerate() {
+                    let colmeta = db_metadata.columns.get(colname).expect("could not get column");
+                    if colmeta.print {
+//                    if colmeta.print=="1" {
+                        pick_col_id.push(i);
+                    }
+                }
+
+                for col_i in &pick_col_id {
+                    csv.push_str(tabledata.columns.get(*col_i).expect("expected column"));
+                    csv.push_str("\t");
+                }
+                csv.push_str("\n");
+
+
+                for r in &tabledata.rows {
+                    let id = r.get(0).expect("empty row");
+                    if set_strains.contains(id) {
+
+                        for col_i in &pick_col_id {
+                            csv.push_str(r.get(*col_i).expect("expected column"));
+                            csv.push_str("\t");
+                        }
+                        csv.push_str("\n");
+                    }
+                }
+            } else {
+                log::debug!("tabledata is missing");
+            }
+
         }
+
+
         csv
     }
 

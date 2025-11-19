@@ -63,8 +63,8 @@ pub fn build_straindb_search(search: &SearchSettings) -> String {
         for crit in search.criteria.iter() {
             match &crit.comparison {
                 ComparisonType::FromTo(from,to) => {
-                    list_formatted_crit.push(format!("{} > {}",sql_check_name(&crit.field), sql_stringarg_to_num(&from))); /////////// can we produce a list of {} prep statement?
-                    list_formatted_crit.push(format!("{} < {}",sql_check_name(&crit.field), sql_stringarg_to_num(&to)));
+                    list_formatted_crit.push(format!("{} >= {}",sql_check_name(&crit.field), sql_stringarg_to_num(&from))); /////////// can we produce a list of {} prep statement?
+                    list_formatted_crit.push(format!("{} <= {}",sql_check_name(&crit.field), sql_stringarg_to_num(&to)));
                 },
                 ComparisonType::Like(v) => {
                    list_formatted_crit.push(format!("{} LIKE \"{}\"",sql_check_name(&crit.field), sql_stringarg_escape(&v)));
@@ -74,7 +74,7 @@ pub fn build_straindb_search(search: &SearchSettings) -> String {
         //println!("{:?}",query);
         query.push_str(list_formatted_crit.join(" AND ").as_str());
     }
-    query.push_str(" limit 6000");
+    query.push_str(" limit 100000");
     query
 }
 
@@ -88,19 +88,44 @@ pub fn build_straindb_search(search: &SearchSettings) -> String {
 pub fn read_database_metadata (
     src: impl Read,
     conn: &Connection
-) -> DatabaseMetadata { 
+) -> Result<DatabaseMetadata> { 
 
     let mut list_dropdown = BTreeMap::new();
+    let mut list_hist = Vec::new();
 
     /////////// Gather statistics to show
-    let hist_source1 = query_histogram(&conn, &"Source_1".to_string()).expect("Failed to make histogram");
-    let hist_pancgroup = query_histogram(&conn, &"BTyper3_Adjusted_panC_Group(predicted_species)".to_string()).expect("Failed to make histogram");
-    let hist_gtdb_species = query_histogram(&conn, &"GTDB_Species".to_string()).expect("Failed to make histogram");
-    let hist_humanillness = query_histogram(&conn, &"Human_Illness".to_string()).expect("Failed to make histogram");
-    let hist_country = query_histogram(&conn, &"Country(Code)".to_string()).expect("Failed to make histogram");    // was: Country_Code
+    list_hist.push(make_stats(
+        &conn, 
+        &"BTyper3 Species".to_string(), 
+        &"matchcol_BTyper3_species".to_string())?);
+
+    list_hist.push(make_stats(
+        &conn, 
+        &"GTDB Species".to_string(), 
+        &"GTDB_Species".to_string())?);
+
+    list_hist.push(make_stats(
+        &conn, 
+        &"Isolation source (Source 1)".to_string(), 
+        &"Source_1".to_string())?);
+
+    list_hist.push(make_stats(
+        &conn, 
+        &"Human Illness".to_string(),
+        &"Human_Illness".to_string())?);
+
+    list_hist.push(make_stats(
+        &conn, 
+        &"BTyper3 adjusted panC group".to_string(), 
+        &"BTyper3_Adjusted_panC_Group(predicted_species)".to_string())?);
+
+
+    let hist_country = query_histogram(
+        &conn, 
+        &"Country(Code)".to_string())?;
+
 
     let num_strain = query_get_strain_count(&conn).expect("Could not get SQL strain count");
-
 
 
     /////////// Other metadata from CSV-file
@@ -112,7 +137,7 @@ pub fn read_database_metadata (
         let record: DatabaseColumn = result.unwrap();
 
         /////////// Drop-down values for relevant fields  --- detect from metadata file?
-        if record.dropdown=="1" {
+        if record.dropdown {
             //let col = record.column_id;//.to_string();
             list_dropdown.insert(record.column_id.clone(), query_dropdown(conn, &record.column_id).expect("Failed to create dropdown"));        
         }
@@ -120,27 +145,16 @@ pub fn read_database_metadata (
         outlist.insert(record.column_id.clone(), record);
     }
 
-    /////////// Drop-down values for relevant fields  --- detect from metadata file?
-//    for col in &vec!["Country","Country(Code)","Continent","Region_Code","Source_1","Source_2","Source_3","Human_Illness","Human_Outbreak","GTDB_Species","BTyper3_Adjusted_panC_Group(predicted_species)"] {
-  //      let col = col.to_string();
-    //    list_dropdown.insert(col.clone(), query_dropdown(conn, &col).expect("Failed to create dropdown"));        
-   // }
-
-
     
 //    println!("{:?}",list_dropdown);
 
-    DatabaseMetadata {
+    Ok(DatabaseMetadata {
         columns: outlist,
         num_strain: num_strain,
         column_dropdown: list_dropdown,
-
-        hist_humanillness: hist_humanillness,
-        hist_source1: hist_source1,
-        hist_pancgroup: hist_pancgroup,
-        hist_gtdb_species: hist_gtdb_species,
-        hist_country: hist_country
-    }
+        list_hist: list_hist,
+        hist_country: hist_country,
+    })
 }
 
 

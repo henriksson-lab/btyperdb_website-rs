@@ -28,32 +28,28 @@ impl Model {
             "___".to_string()
         };
 
-
-
-        //let download = self.link.callback(move |_e | {Msg::Download});
-
-
         html! {
 
             <div class="landingdiv">
+                <div class="commontext">
 
-                <img src="assets/Btyperdb_logo.svg" alt="rust image"/> 
-                <p style="color: rgb(0, 150, 255);">
-                    {"A community curated, global atlas of Bacillus cereus group genomes"}
-                </p>
+                    <img src="assets/Btyperdb_logo.svg" alt="rust image"/> 
+                    <p style="color: rgb(0, 150, 255);">
+                        {"A community curated, global atlas of Bacillus cereus group genomes"}
+                    </p>
 
-                <p style="color: rgb(0, 150, 255);">
-                    {"Database version v1"}
-                </p>
+                    <p style="color: rgb(0, 150, 255);">
+                        {"Database version v1"}
+                    </p>
 
-                <p style="color: rgb(0, 150, 255);">
-                    {num_strain} {" total B. cereus group genomes with curated metadata"}
-                </p>
+                    <p style="color: rgb(0, 150, 255);">
+                        {num_strain} {" total B. cereus group genomes with curated metadata"}
+                    </p>
 
-                <button class="toolbutton" onclick={ctx.link().callback(|_| Msg::OpenPage(CurrentPage::Search))}>
-                    {"Search BTyperDB"}
-                </button>
-
+                    <button class="toolbutton" onclick={ctx.link().callback(|_| Msg::OpenPage(CurrentPage::Search))}>
+                        {"Search BTyperDB"}
+                    </button>
+                </div>
             </div>
         }
     }

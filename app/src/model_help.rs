@@ -12,14 +12,15 @@ impl Model {
             <div>
             <div class="App-divider">{"Help"}</div>
             <div class="landingdiv">
-                <h1>
-                    {"Sorry for the delay! We're under construction 🚧"}
-                </h1>
-                <p>
-                    {"Help will be written here in the near future!"}
-                </p>
-                {""}
-                
+                <div class="commontext">
+                    <h1>
+                        {"Sorry for the delay! We're under construction 🚧"}
+                    </h1>
+                    <p>
+                        {"Help will be written here in the near future!"}
+                    </p>
+                    {""}
+                </div>
             </div>
             <br />
             </div>
