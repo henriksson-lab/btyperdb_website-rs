@@ -119,6 +119,30 @@ impl Model {
 
         let search_controls = if let Some(metadata) = &self.db_metadata {
 
+
+            //Callback: Add a column to show
+            let onchange_addcolumn = ctx.link().callback(move |e: Event | {
+                let target: Option<EventTarget> = e.target();
+                let input = target.and_then(|t| t.dyn_into::<HtmlSelectElement>().ok()).expect("wrong type");
+                Msg::ShowColumn(input.value())
+            });                        
+
+            //Get list of columns
+            let mut list_colstoadd = Vec::new();
+            list_colstoadd.push(html! {
+                <option selected={true}>{""}</option>
+            });
+            if let Some(db_metadata) = &self.db_metadata {
+                for (colname,colmeta) in &db_metadata.columns {
+                    if colmeta.display=="1" && !self.show_columns.contains(colname){ // starts_with("matchcol_")
+                        list_colstoadd.push(html! {
+                            <option>{colname}</option>
+                        });
+                    }
+                }
+            }
+
+            //// Generate HTML: all buttons below the filters
             html! {
                 <div>
                     <div class="withspacer"> /////////likely need to fix divs here
@@ -136,6 +160,11 @@ impl Model {
                             <button class="buttonspacer" onclick={ctx.link().callback(|_| Msg::StartQuery)}>
                                 {"Search"}
                             </button>
+                            
+                            {"Add column to show: "}
+                            <select class="columndrop" onchange={onchange_addcolumn}>
+                                {list_colstoadd}
+                            </select>                            
                         </div>
                     </div>
                 </div>
@@ -149,12 +178,19 @@ impl Model {
 
         let visibility=self.show_search_controls;
 
+        //// Generate HTML: total search pane
         html! {
             <div>
                 <div class="App-divider">
                     {"Search for genomes"}                
                     <button class="toggleview" onclick={ctx.link().callback(move |_| Msg::SetSearchControlVisibility(!visibility))}>
-                        { if self.show_search_controls { html!{"Hide panel"} } else { html!{"Show panel"} } }  
+                        {
+                            if self.show_search_controls { 
+                                html!{"Hide panel"} 
+                            } else { 
+                                html!{"Show panel"} 
+                            } 
+                        }  
                     </button>
                 </div>
 

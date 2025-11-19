@@ -62,6 +62,7 @@ pub enum Msg {
     SetStrainSelected(String, bool),
 
     HideColumn(String),
+    ShowColumn(String),
 }
 
 
@@ -398,8 +399,17 @@ impl Component for Model {
             Msg::HideColumn(col) => {
                 self.show_columns.retain(|s| s != &col);
                 true
-            }
+            },
 
+
+            ////////////////////////////////////////////////////////////
+            // Show a column specified by name
+            Msg::ShowColumn(col) => {
+                if col != "" {
+                    self.show_columns.insert(col);
+                }
+                true
+            },            
         }
     }
 
