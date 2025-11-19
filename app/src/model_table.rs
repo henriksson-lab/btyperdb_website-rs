@@ -33,7 +33,7 @@ impl Model {
 
 
     ////////////////////////////////////////////////////////////
-    /// x
+    /// Generate HTML for one row in the table
     pub fn view_table_row(&self, ctx: &Context<Self>, dt: &TableData, row: &Vec<String>, show_cols: &Vec<usize>) -> Html {
         let btyper_id = row.get(0).expect("Could not get first column of row to use as id");
 
@@ -70,6 +70,9 @@ impl Model {
                             None
                         };
 
+                        /////////// if having links, need to split by , 
+
+
                         //Shorten column text if needed
                         let txt_html = if txt.len() > max_text_len {
                             html!{ <span title={txt.clone()}> {txt[0..max_text_len].to_string()} {"..."}</span> }
@@ -91,7 +94,7 @@ impl Model {
                         } else {
                             txt_html
                         };
-                        html!{<td key={*i}> {txt_link} </td>}
+                        html!{<td key={*i} style="background: #EEEEEE; padding: 1px;"> {txt_link} </td>}
                     }).collect::<Html>()
                 }
             </tr>
@@ -100,16 +103,17 @@ impl Model {
 
 
     ////////////////////////////////////////////////////////////
-    /// x
+    /// Generate HTML for the entire table
     pub fn view_table(&self, ctx: &Context<Self>) -> Html {
 
         if let Some(dt) = &self.tabledata {
 
+            //Check if table empty
             if dt.rows.len()==0 {
                 html! {"(Table is empty)"}
             } else {
 
-
+                //Figure out range of table rows to display
                 let entries_per_page = 100;
 
                 let from_row = self.tabledata_from;
@@ -152,29 +156,39 @@ impl Model {
                 ///// Decide on columns to show
                 let mut show_cols = Vec::new();
                 for (i,colname) in dt.columns.iter().enumerate() {
-                    if !colname.starts_with("matchcol_") {
+                    if self.show_columns.contains(colname) {
                         show_cols.push(i);
                     }
                 }
-
 
                 ///// Generate the header
                 let html_header = html! {
                     <tr>
                         <td>
-                            //// space for checkboxes
+                            // column for checkboxes. empty header
                         </td>
                         {
                             show_cols.iter().map(|i| {
                                 let txt = dt.columns.get(*i).expect("Could not get column");
-                                html!{<th key={*i}> {txt} </th>}
+
+                                //Callback: Removal of column
+                                let copy_colname = txt.clone();
+                                let remove_onclick = ctx.link().callback(move |_e: MouseEvent | {
+                                    Msg::HideColumn(copy_colname.clone())
+                                });
+
+                                //Generate HTML for column header
+                                let pretty_txt = str::replace(txt, "_", " ");
+                                html!{
+                                    <th key={*i}  style="background: #CCFFFF; padding: 1px;"> 
+                                        {pretty_txt} 
+                                        <button onclick={remove_onclick}>{"X"}</button>
+                                    </th>
+                                }
                             }).collect::<Html>()
                         }
                     </tr>
                 };
-
-
-
 
                 ///// Put it all together
                 html! {

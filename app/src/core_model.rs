@@ -61,7 +61,7 @@ pub enum Msg {
 
     SetStrainSelected(String, bool),
 
-    SetCountry(String),
+    HideColumn(String),
 }
 
 
@@ -72,9 +72,6 @@ pub struct Model {
     pub current_page: CurrentPage,
     pub tabledata: Option<TableData>,
     pub tabledata_from: usize,
-
-    //pub task: Option<FetchTask>, ///////////// why do we keep this?
-    //pub download_task: Option<FetchTask>, ///////////// why do we keep this?
         
     pub show_search_controls: bool,
     pub search_settings: SearchSettings,
@@ -84,7 +81,7 @@ pub struct Model {
 
     pub selected_strains: HashSet<String>,
 
-    pub country: String
+    pub show_columns: HashSet<String>,
 }
 
 impl Component for Model {
@@ -108,12 +105,9 @@ impl Component for Model {
 
         Self {
             current_page: CurrentPage::Home,
-            tabledata: None, //Some(tabledata), //None,
+            tabledata: None, 
             tabledata_from: 0,
             
-            //task: None,
-            //download_task: None,
-
             show_search_controls: true,
             search_settings: SearchSettings::new(),
             db_metadata: None,
@@ -121,7 +115,9 @@ impl Component for Model {
 
             selected_strains: HashSet::new(),
 
-            country: "asdasd".to_string()//String::new()
+            show_columns: HashSet::new(),
+
+          //  country: "asdasd".to_string()
         }
     }
 
@@ -133,12 +129,16 @@ impl Component for Model {
     fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
         match msg {
 
+            ////////////////////////////////////////////////////////////
+            // x
             Msg::OpenPage(page) => {
                 self.current_page = page;
                 true
             }
 
 
+            ////////////////////////////////////////////////////////////
+            // x
             Msg::StartQuery => {
                 let json = serde_json::to_string(&self.search_settings).expect("Failed to generate json");
                 //log::debug!("sending {}", json);
@@ -164,6 +164,8 @@ impl Component for Model {
 
 
 
+            ////////////////////////////////////////////////////////////
+            // x
             Msg::FetchDatabaseMetadata => {
                 async fn get_data() -> Msg {
                     let client = reqwest::Client::new();
@@ -188,6 +190,8 @@ impl Component for Model {
 
 
 
+            ////////////////////////////////////////////////////////////
+            // x
             Msg::SetQuery(data) => {
                 //log::trace!("SetQuery: {:?}", data);
                 self.tabledata = data;
@@ -198,7 +202,18 @@ impl Component for Model {
 
 
 
+            ////////////////////////////////////////////////////////////
+            // x
             Msg::SetDatabaseMetadata(data) => {
+
+                //Set columns to show
+                self.show_columns.clear();
+                for (colname, colmeta) in &data.columns {
+                    if colmeta.default_show_column=="1" {
+                        self.show_columns.insert(colname.clone());
+                    }
+                }
+
                 //log::trace!("SetDatabaseMetadata: {:?}", data);
                 self.db_metadata = Some(data);
 
@@ -208,12 +223,16 @@ impl Component for Model {
             }
 
 
+            ////////////////////////////////////////////////////////////
+            // x
             Msg::SetSearchControlVisibility(data) => {
                 //log::trace!("SetSearchControlVisibility: {:?}", data);
                 self.show_search_controls = data;
                 true
             }
 
+            ////////////////////////////////////////////////////////////
+            // x
             Msg::AddSearchFilter => {
                 if let Some(metadata) = &self.db_metadata {
 
@@ -231,6 +250,8 @@ impl Component for Model {
                 true
             },
 
+            ////////////////////////////////////////////////////////////
+            // x
             Msg::DeleteSearchFilter(i) => {
                 //log::trace!("DeleteSearchFilter: {:?}", data);
                 self.search_settings.criteria.remove(i);
@@ -238,6 +259,8 @@ impl Component for Model {
             }
 
 
+            ////////////////////////////////////////////////////////////
+            // x
             Msg::ChangedSearchFieldType(i, val) => {
                 let crit = self.search_settings.criteria.get_mut(i).expect("Could not get field");
                 crit.field = val;
@@ -252,6 +275,8 @@ impl Component for Model {
                 true
             }
 
+            ////////////////////////////////////////////////////////////
+            // x
             Msg::ChangedSearchFieldFrom(i, val) => {
                 let field = self.search_settings.criteria.get_mut(i).expect("Could not get field");
                 if let ComparisonType::FromTo(from,_to) = &mut field.comparison {
@@ -261,6 +286,8 @@ impl Component for Model {
                 false
             }
             
+            ////////////////////////////////////////////////////////////
+            // x
             Msg::ChangedSearchFieldTo(i, val) => {
                 let field = self.search_settings.criteria.get_mut(i).expect("Could not get field");
                 if let ComparisonType::FromTo(_from,to) = &mut field.comparison {
@@ -270,6 +297,8 @@ impl Component for Model {
                 false
             }
 
+            ////////////////////////////////////////////////////////////
+            // x
             Msg::ChangedSearchFieldLike(i, val) => {
                 let field = self.search_settings.criteria.get_mut(i).expect("Could not get field");
                 if let ComparisonType::Like(v) = &mut field.comparison {
@@ -280,11 +309,15 @@ impl Component for Model {
 
 
 
+            ////////////////////////////////////////////////////////////
+            // x
             Msg::SetTableFrom(from) => {
                 self.tabledata_from = from;
                 true
             },
 
+            ////////////////////////////////////////////////////////////
+            // x
             Msg::DownloadFASTAgot(data) => {
                 log::debug!("DownloadFASTAgot");
                 self.download_fasta(&data);
@@ -292,6 +325,8 @@ impl Component for Model {
             },
 
 
+            ////////////////////////////////////////////////////////////
+            // x
             Msg::DownloadFASTA(inc) => {
                 log::debug!("trying to download");
 
@@ -329,6 +364,9 @@ impl Component for Model {
                 false        
             },
 
+
+            ////////////////////////////////////////////////////////////
+            // x
             Msg::DownloadMetadata(inc) => {
                 log::debug!("trying to download");
 
@@ -344,6 +382,8 @@ impl Component for Model {
             },
 
 
+            ////////////////////////////////////////////////////////////
+            // x
             Msg::SetStrainSelected(id, tosel) => {
                 if tosel {
                     self.selected_strains.insert(id);
@@ -352,32 +392,22 @@ impl Component for Model {
                 }
                 false
             },
-
-            Msg::SetCountry(s) => {
-                self.country=s;
+            
+            ////////////////////////////////////////////////////////////
+            // Hide a column specified by name
+            Msg::HideColumn(col) => {
+                self.show_columns.retain(|s| s != &col);
                 true
-            },
-
+            }
 
         }
     }
 
 
-/*
-    ////////////////////////////////////////////////////////////
-    /// x
-    fn change(&mut self, _props: Self::Properties) -> ShouldRender {
-        false
-    }
-
- */
-
-    //let countries = use_state(Vec::new);
 
     ////////////////////////////////////////////////////////////
     /// Top renderer of the page
     fn view(&self, ctx: &Context<Self>) -> Html {
-
 
         let current_page = match self.current_page { 
             CurrentPage::Home => self.view_landing_page(&ctx),
@@ -386,7 +416,6 @@ impl Component for Model {
             CurrentPage::Help => self.view_help_pane(&ctx),
             CurrentPage::About => self.view_about_pane(&ctx)
         };
-
 
         let html_top_buttons = html! {
             <header class="App-header">
@@ -409,11 +438,6 @@ impl Component for Model {
             </div>
         }
     }
-
-
-
-
-
 
 
 }
