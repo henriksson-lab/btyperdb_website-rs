@@ -64,18 +64,9 @@ async fn main() -> std::io::Result<()> {
     let f_meta = File::open(path_meta).expect("Could not open btyperdb_include");
     let reader = BufReader::new(f_meta);
     let db_metadata = read_database_metadata(
-        reader,//Cursor::new(include_bytes!("/Users/mahogny/Desktop/rust/2_actix-yew-template/minimal_testing/meta/btyperdb_include.tsv")),
+        reader,
         &conn
     );
-
-    /* 
-    let ser:SearchSettings = serde_json::from_reader(
-        Cursor::new(include_bytes!("/Users/mahogny/Desktop/rust/2_actix-yew-template/app/src/testsearch.json"))
-    ).expect("asdasd");
-
-    let q = build_straindb_search(&ser);
-    println!("search {:?}",ser);
-    println!("search {}",q);*/
 
     let data = Data::new(Mutex::new(
         ServerData {

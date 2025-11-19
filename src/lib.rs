@@ -57,6 +57,7 @@ pub struct DatabaseColumn {
     pub default_v1: String,	
     pub default_v2: String,	
     pub default_show_column: String,
+    pub dropdown: String, /// should we do bools instead?
     pub display: String,
     pub search: String,
     pub print: String,

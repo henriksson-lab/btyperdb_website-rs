@@ -1,5 +1,6 @@
 use crate::core_model::*;
 
+use my_web_app::TableData;
 use yew::prelude::*;
 
 impl Model {
@@ -33,7 +34,7 @@ impl Model {
 
     ////////////////////////////////////////////////////////////
     /// x
-    pub fn view_table_row(&self, ctx: &Context<Self>, row: &Vec<String>, show_cols: &Vec<usize>) -> Html {
+    pub fn view_table_row(&self, ctx: &Context<Self>, dt: &TableData, row: &Vec<String>, show_cols: &Vec<usize>) -> Html {
         let btyper_id = row.get(0).expect("Could not get first column of row to use as id");
 
         let is_selected=self.selected_strains.contains(btyper_id);
@@ -48,18 +49,49 @@ impl Model {
         html! {
             <tr key={btyper_id.clone()}>
                 <td>
-                    <input type="checkbox" key="check" onclick={onclick} checked={is_selected}/>  /////////// checked="checked"
+                    <input type="checkbox" key="check" onclick={onclick} checked={is_selected}/> 
                 </td>
                 {
                     show_cols.iter().map(|i| {
 
+                        let cur_column = dt.columns.get(*i).expect("no such column");
                         let txt = row.get(*i).expect("no such column").clone();
 
-                        if txt.len() > max_text_len {
-                            html!{<td key={*i}>  <span title={txt.clone()}> {txt[0..max_text_len].to_string()} {"..."}</span> </td>}
+                        //Figure out link to other page, if applicable
+                        let ahref = if cur_column=="NCBI_BioProject" {
+                            Some(format!("https://www.ncbi.nlm.nih.gov/bioproject/?term={}",txt).to_string())
+                        } else if cur_column=="NCBI_BioSample" {
+                            Some(format!("https://www.ncbi.nlm.nih.gov/biosample/?term={}",txt).to_string())
+                        } else if cur_column=="NCBI_Assembly" {
+                            Some(format!("https://www.ncbi.nlm.nih.gov/datasets/genome/{}",txt).to_string())
+                        } else if cur_column=="NCBI_Experiment_Accession" || cur_column=="NCBI_Run_Accession" {
+                            Some(format!("https://www.ncbi.nlm.nih.gov/sra/?term={}",txt).to_string())
                         } else {
-                            html!{<td key={*i}> {txt} </td>}
-                        }
+                            None
+                        };
+
+                        //Shorten column text if needed
+                        let txt_html = if txt.len() > max_text_len {
+                            html!{ <span title={txt.clone()}> {txt[0..max_text_len].to_string()} {"..."}</span> }
+                        } else {
+                            html!{ {txt} }
+                        };
+
+                        //Put all html together
+                        let txt_link = if let Some(url) = ahref {
+                            if url != "" {
+                                html!{
+                                    <a href={url}>
+                                        {txt_html}
+                                    </a>
+                                }
+                            } else {
+                                txt_html
+                            }
+                        } else {
+                            txt_html
+                        };
+                        html!{<td key={*i}> {txt_link} </td>}
                     }).collect::<Html>()
                 }
             </tr>
@@ -154,7 +186,7 @@ impl Model {
                             ///// All rows in the table
                             {
                                 show_rows.into_iter().map(|i| { 
-                                    html!{  self.view_table_row(&ctx, &dt.rows.get(i).expect("could not find row"), &show_cols)  }
+                                    html!{  self.view_table_row(&ctx, &dt, &dt.rows.get(i).expect("could not find row"), &show_cols)  }
                                 }).collect::<Html>()
                             }
                         </table>
