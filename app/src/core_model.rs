@@ -113,8 +113,6 @@ impl Component for Model {
             selected_strains: HashSet::new(),
 
             show_columns: HashSet::new(),
-
-          //  country: "asdasd".to_string()
         }
     }
 
@@ -211,10 +209,11 @@ impl Component for Model {
                     }
                 }
 
+                //Populate search box
+                self.search_settings = data.make_default_search();
+
                 //log::trace!("SetDatabaseMetadata: {:?}", data);
                 self.db_metadata = Some(data);
-
-                //TODO: populate search box
 
                 true
             }
@@ -401,7 +400,9 @@ impl Component for Model {
             // Show a column specified by name
             Msg::ShowColumn(col) => {
                 if col != "" {
+                    //log::debug!("Adding new column to show {}", col);
                     self.show_columns.insert(col);
+                    //log::debug!("now cols: {:?}", self.show_columns);
                 }
                 true
             },            

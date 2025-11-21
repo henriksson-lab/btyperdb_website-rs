@@ -4,6 +4,7 @@ pub mod model_about;
 pub mod model_search;
 pub mod model_stats;
 pub mod model_table;
+pub mod model_tree;
 pub mod model_help;
 pub mod component_map;
 pub mod download;

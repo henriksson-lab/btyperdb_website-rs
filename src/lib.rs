@@ -33,6 +33,9 @@ pub struct DatabaseMetadata {
     pub hist_country: DatabaseHistogram,   
 }
 impl DatabaseMetadata {
+
+    ////////////////////////////////////////////////////////////
+    /// Construct empty database
     pub fn new() -> DatabaseMetadata {
         DatabaseMetadata {
             num_strain: -1,
@@ -42,6 +45,30 @@ impl DatabaseMetadata {
             hist_country: Vec::new(),
         }
     }
+
+
+    ////////////////////////////////////////////////////////////
+    /// Set up default search criteria
+    pub fn make_default_search(&self) -> SearchSettings {
+        
+        let mut list_default = Vec::new();
+        list_default.push("CheckM_Completeness".to_string());
+        list_default.push("CheckM_Contamination".to_string());
+        list_default.push("Quast_N50".to_string());
+        list_default.push("Kraken_Phylum(Bacillota)".to_string());
+
+        let mut list_fields=Vec::new();
+        for v in &list_default {
+            let col = self.columns.get(v).expect("could not find column");
+            let c = SearchCriteria::default_search(col);
+            list_fields.push(c);
+        }
+
+        SearchSettings {
+            criteria: list_fields
+        }
+    }
+
 }
 
 
@@ -68,6 +95,8 @@ pub struct DatabaseColumn {
 }
 
 
+////////////////////////////////////////////////////////////
+/// 1/0 => bool
 fn deserialize_01bool<'de, D>(deserializer: D) -> Result<bool, D::Error>
 where
     D: de::Deserializer<'de>,
@@ -82,6 +111,8 @@ where
 }
 
 
+////////////////////////////////////////////////////////////
+/// bool => 1/0
 fn serialize_01bool<S>(x: &bool, s: S) -> Result<S::Ok, S::Error>
 where
     S: Serializer,
@@ -115,15 +146,33 @@ pub struct SearchSettings {
 impl SearchSettings {
     pub fn new() -> SearchSettings {
 
+        /*
         let mut c= SearchCriteria::new();
         c.field = "BTyperDB_ID".to_string();
         c.comparison = ComparisonType::Like("BTDB_2022-0000001.1".to_string());// "".to_string();
+ */
+        
+        let mut list_default = Vec::new();
+        list_default.push("CheckM_Completeness".to_string());
+        list_default.push("CheckM_Contamination".to_string());
+        list_default.push("Quast_N50".to_string());
+        list_default.push("Kraken_Phylum(Bacillota)".to_string());
+
+        let mut list_fields=Vec::new();
+        for v in list_default {
+            let mut c= SearchCriteria::new();
+            c.field = "BTyperDB_ID".to_string();
+            c.comparison = ComparisonType::Like(v);
+            list_fields.push(c);
+        }
+
 
         SearchSettings {
-            criteria: vec![c]
+            criteria: list_fields
         }
     }
 }
+
 
 ////////////////////////////////////////////////////////////
 /// 
@@ -133,10 +182,25 @@ pub struct SearchCriteria {
     pub comparison: ComparisonType,
 }
 impl SearchCriteria {
+
+
+    ////////////////////////////////////////////////////////////
+    /// 
     pub fn new() -> SearchCriteria {
         SearchCriteria {
             field: "".to_string(),
             comparison: ComparisonType::Like("".to_string())
+        }
+    }
+
+
+    ////////////////////////////////////////////////////////////
+    /// 
+    pub fn default_search(col: &DatabaseColumn) -> SearchCriteria {
+        let comp = ComparisonType::default_comparison(col);
+        SearchCriteria {
+            field: col.column_id.clone(),
+            comparison: comp
         }
     }
 }
@@ -152,6 +216,8 @@ pub enum ComparisonType {
 impl ComparisonType {
 
 
+    ////////////////////////////////////////////////////////////
+    /// Generate a comparison with default fields
     pub fn default_comparison(db: &DatabaseColumn) -> ComparisonType {
         if db.column_type == "text" {
             ComparisonType::Like(db.default_v1.clone()) 
@@ -161,7 +227,7 @@ impl ComparisonType {
                 db.default_v2.clone(),
             ) 
         } else {
-            println!("!!!!!!!!!!!!!!!!!!!!!!!!!! unexpected type of data {}", db.column_type);
+            println!("!!!! unexpected type of data {}", db.column_type);
             ComparisonType::Like("".to_string()) //TODO
         }        
     }

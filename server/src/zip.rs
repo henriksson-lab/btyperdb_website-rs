@@ -30,7 +30,8 @@ pub async fn strainfasta(server_data: Data<Mutex<ServerData>>, req_body: web::Js
     let (w, r) = duplex(4096);
     let options = FileOptions::default()
         .last_modified_time(FileDateTime::Now)
-        .compression_method(CompressionMethod::Deflate());
+        .compression_method(CompressionMethod::Store()); //no compression
+//        .compression_method(CompressionMethod::Deflate());
 
     //let list_files = vec!["BTDB_2022-0001042.1".to_string()];
 
@@ -48,13 +49,13 @@ pub async fn strainfasta(server_data: Data<Mutex<ServerData>>, req_body: web::Js
             let f = clean_btyper_id(&f);
             println!("sending {}",f);
 
-            let fname_outer = format!("{}.fna", f);
+            let fname_outer = format!("{}.fna.gz", f);
             let file_path = path_fna.join(&fname_outer);
 
             //Future option: if each file already zipped, could directly concatenate their contents
             let mut file = File::open(file_path).await.unwrap();
             archive
-                .append(&format!("fastq/{}.fasta", f), &options, &mut file)
+                .append(&format!("fastq/{}.fna.gz", f), &options, &mut file)
                 .await
                 .unwrap();
         }

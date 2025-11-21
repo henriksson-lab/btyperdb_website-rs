@@ -63,11 +63,11 @@ pub fn build_straindb_search(search: &SearchSettings) -> String {
         for crit in search.criteria.iter() {
             match &crit.comparison {
                 ComparisonType::FromTo(from,to) => {
-                    list_formatted_crit.push(format!("{} >= {}",sql_check_name(&crit.field), sql_stringarg_to_num(&from))); /////////// can we produce a list of {} prep statement?
-                    list_formatted_crit.push(format!("{} <= {}",sql_check_name(&crit.field), sql_stringarg_to_num(&to)));
+                    list_formatted_crit.push(format!("`{}` >= {}",sql_check_name(&crit.field), sql_stringarg_to_num(&from))); /////////// can we produce a list of {} prep statement?
+                    list_formatted_crit.push(format!("`{}` <= {}",sql_check_name(&crit.field), sql_stringarg_to_num(&to)));
                 },
                 ComparisonType::Like(v) => {
-                   list_formatted_crit.push(format!("{} LIKE \"{}\"",sql_check_name(&crit.field), sql_stringarg_escape(&v)));
+                   list_formatted_crit.push(format!("`{}` LIKE \"{}\"",sql_check_name(&crit.field), sql_stringarg_escape(&v)));
                 }
             };
         }
@@ -75,6 +75,8 @@ pub fn build_straindb_search(search: &SearchSettings) -> String {
         query.push_str(list_formatted_crit.join(" AND ").as_str());
     }
     query.push_str(" limit 100000");
+
+    println!("search {}", query);
     query
 }
 

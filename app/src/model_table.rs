@@ -131,7 +131,9 @@ impl Model {
 
                     html! {
                         <div>
-                            {"Go to page: "}
+                            <span class="commontext">
+                                {"Go to page: "}
+                            </span>
                             {
                                 possible_pages.into_iter().map(move |p| {
                                     
@@ -157,6 +159,7 @@ impl Model {
                 let mut show_cols = Vec::new();
                 for (i,colname) in dt.columns.iter().enumerate() {
                     if self.show_columns.contains(colname) {
+                        log::debug!("show col: {}",colname);
                         show_cols.push(i);
                     }
                 }

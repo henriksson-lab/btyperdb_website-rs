@@ -53,20 +53,19 @@ impl Model {
 
                 let elem_input = html! { <input class="textbox" type="text" name="value" value={v.clone()} onchange={oninput_like} list={crit.field.clone()}/> };
 
-                //let drop = metadata.column_dropdown.get(&crit.field);
-                //log::debug!("drop {:?}", drop);
-
                 if let Some(list_dropdown) = metadata.column_dropdown.get(&crit.field) {
-
+                    //This ite has a suggested list of value via a dropdown
                     html! {
                         <label>
                             {" Is: "}
                             { elem_input }
-                            <datalist id={crit.field.clone()}>
+                            <datalist>
                             {
                                 list_dropdown.iter().map(|val| { 
                                     html!{
-                                        <option value={val.clone()} />  
+                                        <option>
+                                            {val.clone()}
+                                        </option>  
                                     }
                                 }).collect::<Html>()
                             }
@@ -127,7 +126,7 @@ impl Model {
             //Callback: Add a column to show
             let onchange_addcolumn = ctx.link().callback(move |e: Event | {
                 let target: Option<EventTarget> = e.target();
-                let input = target.and_then(|t| t.dyn_into::<HtmlSelectElement>().ok()).expect("wrong type");
+                let input = target.and_then(|t: EventTarget| t.dyn_into::<HtmlSelectElement>().ok()).expect("wrong type");
                 Msg::ShowColumn(input.value())
             });                        
 
@@ -140,7 +139,9 @@ impl Model {
                 for (colname,colmeta) in &db_metadata.columns {
                     if colmeta.display && !self.show_columns.contains(colname){
                         list_colstoadd.push(html! {
-                            <option>{colname.replace("_"," ")}</option>
+                            <option value={colname.clone()}> // id={colname.clone()} 
+                                {colname.replace("_"," ")}
+                            </option>
                         });
                     }
                 }
