@@ -16,25 +16,25 @@ impl Model {
         let onchange_field = ctx.link().callback(move |e: Event | {
             let target: Option<EventTarget> = e.target();
             let input = target.and_then(|t| t.dyn_into::<HtmlSelectElement>().ok()).expect("wrong type");
-            Msg::ChangedSearchFieldType(i, input.value())
+            MsgCore::ChangedSearchFieldType(i, input.value())
         });
 
         let oninput_from = ctx.link().callback(move |e: Event | {
             let target: Option<EventTarget> = e.target();
             let input = target.and_then(|t| t.dyn_into::<HtmlInputElement>().ok()).expect("wrong type");
-            Msg::ChangedSearchFieldFrom(i, input.value())
+            MsgCore::ChangedSearchFieldFrom(i, input.value())
         });
 
         let oninput_to = ctx.link().callback(move |e: Event | {
             let target: Option<EventTarget> = e.target();
             let input = target.and_then(|t| t.dyn_into::<HtmlInputElement>().ok()).expect("wrong type");
-            Msg::ChangedSearchFieldTo(i, input.value())
+            MsgCore::ChangedSearchFieldTo(i, input.value())
         });
 
         let oninput_like = ctx.link().callback(move |e: Event | {
             let target: Option<EventTarget> = e.target();
             let input = target.and_then(|t| t.dyn_into::<HtmlInputElement>().ok()).expect("wrong type");
-            Msg::ChangedSearchFieldLike(i, input.value())
+            MsgCore::ChangedSearchFieldLike(i, input.value())
         });
 
         //Generate different controls depending on what type of comparison will be made
@@ -102,7 +102,7 @@ impl Model {
         //HTML: all elements together
         html! {
 			<div class="divSearchField">
-				<button name="bDelete" class="buttonspacer" onclick={ctx.link().callback(move |_| Msg::DeleteSearchFilter(i))}>
+				<button name="bDelete" class="buttonspacer" onclick={ctx.link().callback(move |_| MsgCore::DeleteSearchFilter(i))}>
                     {"X"}
                 </button>
 				<select class="columndrop" name="selectfield" onchange={onchange_field}>
@@ -127,7 +127,7 @@ impl Model {
             let onchange_addcolumn = ctx.link().callback(move |e: Event | {
                 let target: Option<EventTarget> = e.target();
                 let input = target.and_then(|t: EventTarget| t.dyn_into::<HtmlSelectElement>().ok()).expect("wrong type");
-                Msg::ShowColumn(input.value())
+                MsgCore::ShowColumn(input.value())
             });                        
 
             //Get list of columns
@@ -160,10 +160,10 @@ impl Model {
                             }).collect::<Html>()
                         }
                         <div>                        
-                            <button class="buttonspacer" onclick={ctx.link().callback(|_| Msg::AddSearchFilter)}>
+                            <button class="buttonspacer" onclick={ctx.link().callback(|_| MsgCore::AddSearchFilter)}>
                                 {"Add filter"}
                             </button>
-                            <button class="buttonspacer" onclick={ctx.link().callback(|_| Msg::StartQuery)}>
+                            <button class="buttonspacer" onclick={ctx.link().callback(|_| MsgCore::StartQuery)}>
                                 {"Search"}
                             </button>
                             
@@ -191,7 +191,7 @@ impl Model {
             <div>
                 <div class="App-divider">
                     {"Search for genomes"}                
-                    <button class="toggleview" onclick={ctx.link().callback(move |_| Msg::SetSearchControlVisibility(!visibility))}>
+                    <button class="toggleview" onclick={ctx.link().callback(move |_| MsgCore::SetSearchControlVisibility(!visibility))}>
                         {
                             if self.show_search_controls { 
                                 html!{"Hide panel"} 
@@ -207,17 +207,17 @@ impl Model {
                 { self.view_table(&ctx) }
 
                 <div class="downloadnav">
-                    <button class="buttonspacer" onclick={ctx.link().callback(move |_e | {Msg::DownloadFASTA(IncludeData::Selected)})}>
+                    <button class="buttonspacer" onclick={ctx.link().callback(move |_e | {MsgCore::DownloadFASTA(IncludeData::Selected)})}>
                         {"FASTA: Download selected"}
                     </button>
-                    <button class="buttonspacer" onclick={ctx.link().callback(move |_e | {Msg::DownloadFASTA(IncludeData::All)})}>
+                    <button class="buttonspacer" onclick={ctx.link().callback(move |_e | {MsgCore::DownloadFASTA(IncludeData::All)})}>
                         {"FASTA: Download displayed"}
                     </button>
 
-                    <button class="buttonspacer" onclick={ctx.link().callback(move |_e | {Msg::DownloadMetadata(IncludeData::Selected)})}>
+                    <button class="buttonspacer" onclick={ctx.link().callback(move |_e | {MsgCore::DownloadMetadata(IncludeData::Selected)})}>
                         {"Metadata: Download selected"}
                     </button>
-                    <button class="buttonspacer" onclick={ctx.link().callback(move |_e | {Msg::DownloadMetadata(IncludeData::All)})}>
+                    <button class="buttonspacer" onclick={ctx.link().callback(move |_e | {MsgCore::DownloadMetadata(IncludeData::All)})}>
                         {"Metadata: Download displayed"}
                     </button>
                 </div>

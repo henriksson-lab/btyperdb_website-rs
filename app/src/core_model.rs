@@ -14,6 +14,11 @@ use geojson::GeoJson;
 use web_sys::window;
 use yew::prelude::*;
 
+use crate::appstate::AsyncData;
+use crate::resize::ComponentSize;
+use crate::resize::ComponentSizeObserver;
+use crate::treeview::treelayout::TreeLayout;
+
 ////////////////////////////////////////////////////////////
 /// Which page is currently being shown?
 #[derive(Debug)]
@@ -21,6 +26,7 @@ use yew::prelude::*;
 pub enum CurrentPage {
     Home,
     Search,
+    Tree,
     Statistics,
     Help,
     About,
@@ -38,7 +44,9 @@ pub enum IncludeData {
 ////////////////////////////////////////////////////////////
 /// Message sent to the event system for updating the page
 #[derive(Debug)]
-pub enum Msg {
+pub enum MsgCore {
+
+    WindowResize(ComponentSize),
 
     OpenPage(CurrentPage),
     StartQuery,
@@ -83,10 +91,14 @@ pub struct Model {
     pub selected_strains: HashSet<String>,
 
     pub show_columns: HashSet<String>,
+
+    pub last_component_size: ComponentSize,
+
+    pub treedata: AsyncData<TreeLayout>,
 }
 
 impl Component for Model {
-    type Message = Msg;
+    type Message = MsgCore;
 
     type Properties = ();
 
@@ -98,7 +110,9 @@ impl Component for Model {
         let geojson = GeoJson::from_reader(Cursor::new(include_bytes!("custom.geo.json"))).unwrap();
 
         //Get metadata about database right away
-        ctx.link().send_message(Msg::FetchDatabaseMetadata);
+        ctx.link().send_message(MsgCore::FetchDatabaseMetadata);
+
+        let treedata = AsyncData::new(TreeLayout::new());
 
         Self {
             current_page: CurrentPage::Home,
@@ -113,6 +127,11 @@ impl Component for Model {
             selected_strains: HashSet::new(),
 
             show_columns: HashSet::new(),
+
+            last_component_size: ComponentSize { width: 100.0, height: 100.0 },
+            
+            treedata: treedata,
+
         }
     }
 
@@ -125,8 +144,16 @@ impl Component for Model {
         match msg {
 
             ////////////////////////////////////////////////////////////
+            // Message: Window is resized
+            MsgCore::WindowResize(size) => {
+                log::debug!("window resize");
+                self.last_component_size = size;
+                true
+            },
+
+            ////////////////////////////////////////////////////////////
             // x
-            Msg::OpenPage(page) => {
+            MsgCore::OpenPage(page) => {
                 self.current_page = page;
                 true
             }
@@ -134,10 +161,10 @@ impl Component for Model {
 
             ////////////////////////////////////////////////////////////
             // x
-            Msg::StartQuery => {
+            MsgCore::StartQuery => {
                 let json = serde_json::to_string(&self.search_settings).expect("Failed to generate json");
                 //log::debug!("sending {}", json);
-                async fn get_data(json: String) -> Msg {
+                async fn get_data(json: String) -> MsgCore {
                     let client = reqwest::Client::new();
                     let res: TableData = client.post(format!("{}/straindata",get_host_url()))
                         .header("Content-Type", "application/json")
@@ -148,7 +175,7 @@ impl Component for Model {
                         .json()
                         .await
                         .expect("Failed to get table data");
-                    Msg::SetQuery(Some(res))
+                    MsgCore::SetQuery(Some(res))
                 }
 
                 ctx.link().send_future(get_data(json));
@@ -161,8 +188,8 @@ impl Component for Model {
 
             ////////////////////////////////////////////////////////////
             // x
-            Msg::FetchDatabaseMetadata => {
-                async fn get_data() -> Msg {
+            MsgCore::FetchDatabaseMetadata => {
+                async fn get_data() -> MsgCore {
                     let client = reqwest::Client::new();
                     let url=format!("{}/strainmeta",get_host_url());
                     //log::debug!("wtf -{}-",url);
@@ -176,7 +203,7 @@ impl Component for Model {
                         .json()
                         .await
                         .expect("Failed to get metadata");
-                    Msg::SetDatabaseMetadata(res)
+                    MsgCore::SetDatabaseMetadata(res)
                 }
 
                 ctx.link().send_future(get_data());
@@ -187,7 +214,7 @@ impl Component for Model {
 
             ////////////////////////////////////////////////////////////
             // x
-            Msg::SetQuery(data) => {
+            MsgCore::SetQuery(data) => {
                 //log::trace!("SetQuery: {:?}", data);
                 self.tabledata = data;
                 self.tabledata_from = 0;
@@ -199,7 +226,7 @@ impl Component for Model {
 
             ////////////////////////////////////////////////////////////
             // x
-            Msg::SetDatabaseMetadata(data) => {
+            MsgCore::SetDatabaseMetadata(data) => {
 
                 //Set columns to show
                 self.show_columns.clear();
@@ -221,7 +248,7 @@ impl Component for Model {
 
             ////////////////////////////////////////////////////////////
             // x
-            Msg::SetSearchControlVisibility(data) => {
+            MsgCore::SetSearchControlVisibility(data) => {
                 //log::trace!("SetSearchControlVisibility: {:?}", data);
                 self.show_search_controls = data;
                 true
@@ -229,7 +256,7 @@ impl Component for Model {
 
             ////////////////////////////////////////////////////////////
             // x
-            Msg::AddSearchFilter => {
+            MsgCore::AddSearchFilter => {
                 if let Some(metadata) = &self.db_metadata {
 
                     let col = metadata.columns.get("BTyperDB_ID").expect("no BTyperDB_ID column");
@@ -248,7 +275,7 @@ impl Component for Model {
 
             ////////////////////////////////////////////////////////////
             // x
-            Msg::DeleteSearchFilter(i) => {
+            MsgCore::DeleteSearchFilter(i) => {
                 //log::trace!("DeleteSearchFilter: {:?}", data);
                 self.search_settings.criteria.remove(i);
                 true
@@ -257,7 +284,7 @@ impl Component for Model {
 
             ////////////////////////////////////////////////////////////
             // x
-            Msg::ChangedSearchFieldType(i, val) => {
+            MsgCore::ChangedSearchFieldType(i, val) => {
                 let crit = self.search_settings.criteria.get_mut(i).expect("Could not get field");
                 crit.field = val;
 
@@ -273,7 +300,7 @@ impl Component for Model {
 
             ////////////////////////////////////////////////////////////
             // x
-            Msg::ChangedSearchFieldFrom(i, val) => {
+            MsgCore::ChangedSearchFieldFrom(i, val) => {
                 let field = self.search_settings.criteria.get_mut(i).expect("Could not get field");
                 if let ComparisonType::FromTo(from,_to) = &mut field.comparison {
                     *from = val;
@@ -284,7 +311,7 @@ impl Component for Model {
             
             ////////////////////////////////////////////////////////////
             // x
-            Msg::ChangedSearchFieldTo(i, val) => {
+            MsgCore::ChangedSearchFieldTo(i, val) => {
                 let field = self.search_settings.criteria.get_mut(i).expect("Could not get field");
                 if let ComparisonType::FromTo(_from,to) = &mut field.comparison {
                     *to = val;
@@ -295,7 +322,7 @@ impl Component for Model {
 
             ////////////////////////////////////////////////////////////
             // x
-            Msg::ChangedSearchFieldLike(i, val) => {
+            MsgCore::ChangedSearchFieldLike(i, val) => {
                 let field = self.search_settings.criteria.get_mut(i).expect("Could not get field");
                 if let ComparisonType::Like(v) = &mut field.comparison {
                     *v = val;
@@ -307,14 +334,14 @@ impl Component for Model {
 
             ////////////////////////////////////////////////////////////
             // x
-            Msg::SetTableFrom(from) => {
+            MsgCore::SetTableFrom(from) => {
                 self.tabledata_from = from;
                 true
             },
 
             ////////////////////////////////////////////////////////////
             // x
-            Msg::DownloadFASTAgot(data) => {
+            MsgCore::DownloadFASTAgot(data) => {
                 log::debug!("DownloadFASTAgot");
                 self.download_fasta(&data);
                 false
@@ -323,7 +350,7 @@ impl Component for Model {
 
             ////////////////////////////////////////////////////////////
             // x
-            Msg::DownloadFASTA(inc) => {
+            MsgCore::DownloadFASTA(inc) => {
                 log::debug!("trying to download");
 
                 let list_strains = self.get_strains(&inc);
@@ -340,7 +367,7 @@ impl Component for Model {
                     //log::debug!("sending {}", json);
 
                     //log::debug!("sending {}", json);
-                    async fn get_data(json: String) -> Msg {
+                    async fn get_data(json: String) -> MsgCore {
                         let client = reqwest::Client::new();
                         let res = client.post(format!("{}/strainfasta",get_host_url()))
                             .header("Content-Type", "application/json")
@@ -352,7 +379,7 @@ impl Component for Model {
                             .await
                             .expect("Failed to get table data");
 
-                        Msg::DownloadFASTAgot(res.to_vec())
+                        MsgCore::DownloadFASTAgot(res.to_vec())
                     }
                     ctx.link().send_future(get_data(json));
                 }        
@@ -362,7 +389,7 @@ impl Component for Model {
 
             ////////////////////////////////////////////////////////////
             // x
-            Msg::DownloadMetadata(inc) => {
+            MsgCore::DownloadMetadata(inc) => {
                 log::debug!("trying to download");
 
                 let list_strains = self.get_strains(&inc);
@@ -379,7 +406,7 @@ impl Component for Model {
 
             ////////////////////////////////////////////////////////////
             // x
-            Msg::SetStrainSelected(id, tosel) => {
+            MsgCore::SetStrainSelected(id, tosel) => {
                 if tosel {
                     self.selected_strains.insert(id);
                 } else {
@@ -390,7 +417,7 @@ impl Component for Model {
             
             ////////////////////////////////////////////////////////////
             // Hide a column specified by name
-            Msg::HideColumn(col) => {
+            MsgCore::HideColumn(col) => {
                 self.show_columns.retain(|s| s != &col);
                 true
             },
@@ -398,7 +425,7 @@ impl Component for Model {
 
             ////////////////////////////////////////////////////////////
             // Show a column specified by name
-            Msg::ShowColumn(col) => {
+            MsgCore::ShowColumn(col) => {
                 if col != "" {
                     //log::debug!("Adding new column to show {}", col);
                     self.show_columns.insert(col);
@@ -415,26 +442,38 @@ impl Component for Model {
     /// Top renderer of the page
     fn view(&self, ctx: &Context<Self>) -> Html {
 
+        let onsize = ctx.link().callback(|size: ComponentSize| {
+            MsgCore::WindowResize(size)
+        });
+
         let current_page = match self.current_page { 
             CurrentPage::Home => self.view_landing_page(&ctx),
             CurrentPage::Search => self.view_search_pane(&ctx),
+            CurrentPage::Tree => self.view_tree_pane(&ctx),
             CurrentPage::Statistics => self.view_statistics_pane(&ctx),
             CurrentPage::Help => self.view_help_pane(&ctx),
             CurrentPage::About => self.view_about_pane(&ctx)
         };
 
         let html_top_buttons = html! {
-            <header class="App-header">
-                <div id="topmenu" class="topnav">
-                    <div class="topnav-right">
-                        <a class={active_if(self.current_page==CurrentPage::Home)}       onclick={ctx.link().callback(|_| Msg::OpenPage(CurrentPage::Home))}>{"Home"}</a> 
-                        <a class={active_if(self.current_page==CurrentPage::Search)}     onclick={ctx.link().callback(|_| Msg::OpenPage(CurrentPage::Search))}>{"Search"}</a>
-                        <a class={active_if(self.current_page==CurrentPage::Statistics)} onclick={ctx.link().callback(|_| Msg::OpenPage(CurrentPage::Statistics))}>{"Statistics"}</a>
-                        <a class={active_if(self.current_page==CurrentPage::Help)}       onclick={ctx.link().callback(|_| Msg::OpenPage(CurrentPage::Help))}>{"Help"}</a>
-                        <a class={active_if(self.current_page==CurrentPage::About)}      onclick={ctx.link().callback(|_| Msg::OpenPage(CurrentPage::About))}>{"About"}</a>
+
+            <div style="position: relative;"> // added; does this mess anything up?
+                <ComponentSizeObserver onsize={onsize} />
+
+                <header class="App-header">
+                    <div id="topmenu" class="topnav">
+                        <div class="topnav-right">
+                            <a class={active_if(self.current_page==CurrentPage::Home)}       onclick={ctx.link().callback(|_| MsgCore::OpenPage(CurrentPage::Home))}>{"Home"}</a> 
+                            <a class={active_if(self.current_page==CurrentPage::Search)}     onclick={ctx.link().callback(|_| MsgCore::OpenPage(CurrentPage::Search))}>{"Search"}</a>
+                            <a class={active_if(self.current_page==CurrentPage::Tree)}       onclick={ctx.link().callback(|_| MsgCore::OpenPage(CurrentPage::Tree))}>{"Tree"}</a>
+                            <a class={active_if(self.current_page==CurrentPage::Statistics)} onclick={ctx.link().callback(|_| MsgCore::OpenPage(CurrentPage::Statistics))}>{"Statistics"}</a>
+                            <a class={active_if(self.current_page==CurrentPage::Help)}       onclick={ctx.link().callback(|_| MsgCore::OpenPage(CurrentPage::Help))}>{"Help"}</a>
+                            <a class={active_if(self.current_page==CurrentPage::About)}      onclick={ctx.link().callback(|_| MsgCore::OpenPage(CurrentPage::About))}>{"About"}</a>
+                        </div>
                     </div>
-                </div>
-            </header>        
+                </header>      
+
+            </div>  
         };
 
         html! {

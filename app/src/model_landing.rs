@@ -46,7 +46,7 @@ impl Model {
                         {num_strain} {" total B. cereus group genomes with curated metadata"}
                     </p>
 
-                    <button class="toolbutton" onclick={ctx.link().callback(|_| Msg::OpenPage(CurrentPage::Search))}>
+                    <button class="toolbutton" onclick={ctx.link().callback(|_| MsgCore::OpenPage(CurrentPage::Search))}>
                         {"Search BTyperDB"}
                     </button>
                 </div>

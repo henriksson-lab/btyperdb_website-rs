@@ -41,7 +41,7 @@ impl Model {
 
         let btyper_id_copy= btyper_id.clone();
         let onclick: Callback<MouseEvent> = ctx.link().callback(move |_e | {
-            Msg::SetStrainSelected(btyper_id_copy.clone(), !is_selected)
+            MsgCore::SetStrainSelected(btyper_id_copy.clone(), !is_selected)
         });
 
         let max_text_len = 40;
@@ -138,7 +138,7 @@ impl Model {
                                 possible_pages.into_iter().map(move |p| {
                                     
                                     let onclick = ctx.link().callback(move |_e | {
-                                        Msg::SetTableFrom(p*entries_per_page)
+                                        MsgCore::SetTableFrom(p*entries_per_page)
                                     });
 
                                     html! { 
@@ -177,7 +177,7 @@ impl Model {
                                 //Callback: Removal of column
                                 let copy_colname = txt.clone();
                                 let remove_onclick = ctx.link().callback(move |_e: MouseEvent | {
-                                    Msg::HideColumn(copy_colname.clone())
+                                    MsgCore::HideColumn(copy_colname.clone())
                                 });
 
                                 //Generate HTML for column header
