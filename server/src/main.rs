@@ -2,6 +2,7 @@ pub mod zip;
 pub mod stats;
 pub mod escaping;
 pub mod straintable;
+pub mod tree;
 
 use std::fs::File;
 use std::path::{Path, PathBuf};
@@ -15,9 +16,12 @@ use rusqlite::{Connection};
 use serde::Deserialize;
 use serde::Serialize;
 
-use my_web_app::DatabaseMetadata;
+use my_web_app::{DatabaseMetadata, TreeData};
 use straintable::*;
+use tree::*;
 use zip::*;
+
+
 
 ////////////////////////////////////////////////////////////
 /// Backend state
@@ -25,15 +29,17 @@ pub struct ServerData {
     conn: Connection,
     db_metadata: DatabaseMetadata,
     path_store: PathBuf,
+    tree: TreeData,
 }
 
 
+////////////////////////////////////////////////////////////
+/// Backend state
 #[derive(Debug, Deserialize, Serialize)]
 struct ConfigFile {
     store: String,
     bind: String,
 }
-
 
 
 
@@ -51,9 +57,15 @@ async fn main() -> std::io::Result<()> {
     let f_meta = File::open("config.json").expect("Could not open config.json");
     let config_reader = BufReader::new(f_meta);
     let config_file:ConfigFile = serde_json::from_reader(config_reader).expect("Could not open config file");
+    let path_store = Path::new(&config_file.store);
+
+    //Read tree
+    let tree_str = std::fs::read_to_string(path_store.join("tree.nwk"))?;
+    let tree = TreeData {
+        tree_str
+    };
 
     // Open SQL database
-    let path_store = Path::new(&config_file.store);
     let path_sql = path_store.join(Path::new("meta/data.sqlite"));
     //let path = "/Users/mahogny/Desktop/rust/2_actix-yew-template/minimal_testing/meta/data.sqlite";
     let conn = Connection::open_with_flags(&path_sql, OpenFlags::SQLITE_OPEN_READ_ONLY).expect("Could not open SQL database");
@@ -70,6 +82,7 @@ async fn main() -> std::io::Result<()> {
         ServerData {
             conn: conn,
             db_metadata: db_metadata,
+            tree: tree,
             path_store: path_store.into()
         }
     ));
@@ -81,6 +94,7 @@ async fn main() -> std::io::Result<()> {
             .service(straindata)
             .service(strainmeta)
             .service(strainfasta)
+            .service(treedata)
             .service(Files::new("/", "./dist/").index_file("index.html"))
             .default_service(
                 web::route().to(|| HttpResponse::NotFound()),  //header("Location", "/").finish()

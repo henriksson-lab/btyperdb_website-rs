@@ -11,6 +11,7 @@ use my_web_app::SearchCriteria;
 use geojson::GeoJson;
 
 
+use my_web_app::TreeData;
 use web_sys::window;
 use yew::prelude::*;
 
@@ -54,8 +55,12 @@ pub enum MsgCore {
     SetSearchControlVisibility(bool),
     AddSearchFilter,
     DeleteSearchFilter(usize),
-    SetDatabaseMetadata(DatabaseMetadata),
+
     FetchDatabaseMetadata,
+    SetDatabaseMetadata(DatabaseMetadata),
+
+    FetchTreeData,
+    SetTreeData(TreeLayout),
 
     ChangedSearchFieldType(usize, String),
     ChangedSearchFieldFrom(usize, String),
@@ -112,8 +117,12 @@ impl Component for Model {
         //Get metadata about database right away
         ctx.link().send_message(MsgCore::FetchDatabaseMetadata);
 
-        let treedata = AsyncData::new(TreeLayout::new());
+        //Get tree right away (or wait until tab open?)
+        ctx.link().send_message(MsgCore::FetchTreeData);
 
+//        let treedata = AsyncData::new(TreeLayout::new());
+        let treedata = AsyncData::NotLoaded;
+        
         Self {
             current_page: CurrentPage::Home,
             tabledata: None, 
@@ -210,6 +219,48 @@ impl Component for Model {
                 false
             }
 
+
+            ////////////////////////////////////////////////////////////
+            // x
+            MsgCore::FetchTreeData => {
+                async fn get_data() -> MsgCore {
+                    let client = reqwest::Client::new();
+                    let url=format!("{}/treedata",get_host_url());
+                    //log::debug!("wtf -{}-",url);
+                    log::debug!("getting tree");
+                    let res: TreeData = client.get(url)  
+                        .header("Content-Type", "application/json")
+                        .body("")
+                        //no body
+                        .send()
+                        .await
+                        .expect("Failed to send request")
+                        .json()
+                        .await
+                        .expect("Failed to get treedata");
+                    log::debug!("making layout");
+                    let lay = TreeLayout::new(&res.tree_str);
+                    log::debug!("setting layout");
+                    MsgCore::SetTreeData(lay)
+                }
+
+                ctx.link().send_future(get_data());
+                false
+            }
+
+
+
+
+            ////////////////////////////////////////////////////////////
+            // x
+            MsgCore::SetTreeData(lay) => {
+
+                //log::trace!("SetDatabaseMetadata: {:?}", data);
+                //let lay = TreeLayout::new(&data.tree_str);
+                self.treedata = AsyncData::new(lay);
+
+                true
+            }
 
 
             ////////////////////////////////////////////////////////////

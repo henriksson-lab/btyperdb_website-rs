@@ -5,6 +5,7 @@ use crate::treeview::Rectangle2D;
 
 ////////////////////////////////////////////////////////////
 /// x
+#[derive(Debug)]
 pub struct TreeLayout {
 
     pub list_x:Vec<f32>,
@@ -25,12 +26,14 @@ impl TreeLayout {
 
     ////////////////////////////////////////////////////////////
     /// x
-    pub fn new() -> TreeLayout {
+    pub fn new(newick_str: &str) -> TreeLayout {
 
 //        let newick_str = "((A:0.1,B:0.2)F:0.6,(C:0.3,D:0.4)E:0.5)G;";
-        let newick_str = include_str!("parsnp2_noC_snps.fna.treefile"); 
+//        let newick_str = include_str!("parsnp2_noC_snps.fna.treefile"); 
+//        let newick_str = include_str!("All-Species_rooted.nwk"); 
 
-        let tree = PhyloTree::from_newick(newick_str.as_bytes()).expect("Could not parse tree");
+        log::debug!("reading phylo tree; how can it be so slow??");
+        let tree: SimpleRootedTree<String, f32, f32> = PhyloTree::from_newick(newick_str.as_bytes()).expect("Could not parse tree");
 
         let root = tree.get_root_id();
 
@@ -62,15 +65,15 @@ impl TreeLayout {
                 *this_y = sum_y / (num_children as f32);
             }
         }
-        log::debug!("final y {}", next_y);
+        //log::debug!("final y {}", next_y);
 
 
 
         //Figure out x-position of all entries        
         let list_x = TreeLayout::calc_x(&tree);
 
-        log::debug!("x: {:?}", list_x);
-        log::debug!("y: {:?}", list_y);
+        //log::debug!("x: {:?}", list_x);
+        //log::debug!("y: {:?}", list_y);
 
         //Figure out extent of diagram, for camera
         let max_y=next_y;

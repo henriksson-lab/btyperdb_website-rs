@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use phylo::tree::SimpleRootedTree;
 use serde::{Deserialize, Serialize, Serializer, de};
 
 type DatabaseHistogram = Vec<(String,i32)>;
@@ -234,3 +235,21 @@ impl ComparisonType {
 
 
 }
+
+
+
+
+////////////////////////////////////////////////////////////
+/// 
+#[derive(Debug, Deserialize, Serialize)]
+pub struct TreeData {
+    pub tree_str: String,
+}
+
+
+/*
+#[derive(Debug, Deserialize, Serialize)]
+pub struct Test {
+    pub data: SimpleRootedTree<String, f32, f32>,
+
+} */
