@@ -7,5 +7,5 @@ pub mod treelayout;
 //Re-exports
 pub use treeview_camera::Camera2D;
 pub use treeview_camera::Rectangle2D;
-pub use treeview_main::ReductionView;
+pub use treeview_main::TreeView;
 pub use treelayout::TreeLayout;

@@ -2,7 +2,7 @@ use crate::{core_model::*};
 
 use yew::{prelude::*};
 
-use super::ReductionView;
+use super::TreeView;
 
 
 impl Model {
@@ -30,12 +30,13 @@ impl Model {
         html! {
             <div>
                 <div> 
-                    <ReductionView 
+                    <TreeView 
 //                        on_cell_hovered={on_cell_hovered} 
 //                        on_cell_clicked={on_cell_clicked} 
                         treedata={self.treedata.clone()}
                         on_propagate={on_propagate}
                         last_component_size={self.last_component_size.clone()}
+                        tabledata={self.tabledata.clone()}
                     />
                 </div>
             </div>

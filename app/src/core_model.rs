@@ -51,7 +51,7 @@ pub enum MsgCore {
 
     OpenPage(CurrentPage),
     StartQuery,
-    SetQuery(Option<TableData>),
+    SetQuery(AsyncData<TableData>),
     SetSearchControlVisibility(bool),
     AddSearchFilter,
     DeleteSearchFilter(usize),
@@ -84,7 +84,7 @@ pub enum MsgCore {
 /// State of the page
 pub struct Model {
     pub current_page: CurrentPage,
-    pub tabledata: Option<TableData>,
+    pub tabledata: AsyncData<TableData>,
     pub tabledata_from: usize,
         
     pub show_search_controls: bool,
@@ -125,7 +125,7 @@ impl Component for Model {
         
         Self {
             current_page: CurrentPage::Home,
-            tabledata: None, 
+            tabledata: AsyncData::NotLoaded, 
             tabledata_from: 0,
             
             show_search_controls: true,
@@ -171,6 +171,11 @@ impl Component for Model {
             ////////////////////////////////////////////////////////////
             // x
             MsgCore::StartQuery => {
+
+                //Set "loading" placeholder
+                ctx.link().send_message(MsgCore::SetQuery(AsyncData::Loading));
+
+                //Start query
                 let json = serde_json::to_string(&self.search_settings).expect("Failed to generate json");
                 //log::debug!("sending {}", json);
                 async fn get_data(json: String) -> MsgCore {
@@ -184,7 +189,7 @@ impl Component for Model {
                         .json()
                         .await
                         .expect("Failed to get table data");
-                    MsgCore::SetQuery(Some(res))
+                    MsgCore::SetQuery(AsyncData::new(res))
                 }
 
                 ctx.link().send_future(get_data(json));

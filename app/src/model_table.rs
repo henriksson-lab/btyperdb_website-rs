@@ -1,4 +1,4 @@
-use crate::core_model::*;
+use crate::{appstate::AsyncData, core_model::*};
 
 use my_web_app::TableData;
 use yew::prelude::*;
@@ -15,7 +15,7 @@ impl Model {
         let mut list_strains = Vec::new();
         match inc {
             IncludeData::All => {
-                if let Some(tabledata) = &self.tabledata {
+                if let AsyncData::Loaded(tabledata) = &self.tabledata {
                     for r in &tabledata.rows {
                         let id = r.get(0).expect("no col 0"); /////////////////// is this btyperid?
                         list_strains.push(id.clone());
@@ -106,7 +106,9 @@ impl Model {
     /// Generate HTML for the entire table
     pub fn view_table(&self, ctx: &Context<Self>) -> Html {
 
-        if let Some(dt) = &self.tabledata {
+        if let AsyncData::Loading = &self.tabledata {
+            html! {"Loading table..."}
+        } else if let AsyncData::Loaded(dt) = &self.tabledata {
 
             //Check if table empty
             if dt.rows.len()==0 {

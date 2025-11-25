@@ -43,7 +43,7 @@ impl TreeLayout {
 
         let root = tree.get_root_id();
 
-        log::debug!("Num nodes: {}",tree.num_nodes());
+        //log::debug!("Num nodes: {}",tree.num_nodes());
 
         //Create default set of y-positions (all to be overwritten)
         let mut list_y = Vec::with_capacity(tree.num_nodes());
@@ -181,9 +181,9 @@ impl TreeLayout {
     ////////////////////////////////////////////////////////////
     /// Get nodeIDs from list of strain names.
     /// Ignore missing strain names
-    pub fn get_ids_from_names(&self, list_strains: Vec<String>) -> Vec<usize> {
+    pub fn get_ids_from_names(&self, list_strains: &Vec<String>) -> Vec<usize> {
         let mut list_ids:Vec<usize> = Vec::new();
-        for s in &list_strains {
+        for s in list_strains {
             let id = self.map_name_to_id.get(s);
             if let Some(id)=id {
                 list_ids.push(*id);
@@ -195,10 +195,10 @@ impl TreeLayout {
 
     ////////////////////////////////////////////////////////////
     /// The equivalent of R groupOTU
-    pub fn select_common_ancestors(&self, list_branches: Vec<usize>) -> HashSet<usize> {
+    pub fn select_common_ancestors(&self, list_branches: &Vec<usize>) -> HashSet<usize> {
 
         let mut list_sel:HashSet<usize> = HashSet::new();
-        for v in &list_branches {
+        for v in list_branches {
             list_sel.insert(*v);
         }
 
@@ -208,18 +208,21 @@ impl TreeLayout {
 
             //Check if all children are selected
             let mut all_children_in_sel = true;
-            for child_id in self.tree.get_node_children_ids(node_id) {
+            let mut num_children=0;
+            for child_id in self.tree.get_node_children_ids(node_id) {                
                 if !list_sel.contains(&child_id) {
                     all_children_in_sel = false;
                     break;
                 }
+                num_children += 1;
             }
 
-            if all_children_in_sel {
+            if num_children>0 && all_children_in_sel {
                 list_sel.insert(node_id);
             }
         }
 
+        //log::debug!("ids {:?}", list_sel);
         list_sel
     }
 

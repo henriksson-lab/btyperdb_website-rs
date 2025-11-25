@@ -1,5 +1,4 @@
 use std::collections::BTreeMap;
-use phylo::tree::SimpleRootedTree;
 use serde::{Deserialize, Serialize, Serializer, de};
 
 type DatabaseHistogram = Vec<(String,i32)>;

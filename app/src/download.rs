@@ -6,6 +6,7 @@ use web_sys::{wasm_bindgen::JsValue, Blob, BlobPropertyBag};
 use web_sys::{HtmlElement};
 use web_sys::window;
 
+use crate::appstate::AsyncData;
 use crate::core_model::Model;
 
 
@@ -23,7 +24,7 @@ impl Model {
                 set_strains.insert(e);
             }
 
-            if let Some(tabledata) = &self.tabledata {
+            if let AsyncData::Loaded(tabledata) = &self.tabledata {
 
                 //Decide which columns to include
                 let mut pick_col_id = Vec::new();

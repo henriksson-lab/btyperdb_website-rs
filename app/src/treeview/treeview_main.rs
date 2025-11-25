@@ -1,4 +1,5 @@
 
+use my_web_app::TableData;
 use wasm_bindgen::JsCast;
 use web_sys::window;
 use web_sys::{DomRect, EventTarget, HtmlCanvasElement, WebGlRenderingContext as GL};
@@ -43,19 +44,20 @@ pub struct Props {
     pub on_propagate: Callback<MsgCore>,
     pub last_component_size: ComponentSize,
     pub treedata: AsyncData<TreeLayout>,
+    pub tabledata: AsyncData<TableData>,
 }
 
 
 ////////////////////////////////////////////////////////////
 /// random note: Wrap gl in Rc (Arc for multi-threaded) so it can be injected into the render-loop closure.
-pub struct ReductionView {
+pub struct TreeView {
     node_ref: NodeRef,
     last_pos: (f32,f32),
     camera: Camera2D,
     last_treedata: AsyncData<TreeLayout>,
 }
 
-impl Component for ReductionView {
+impl Component for TreeView {
     type Message = MsgReduction;
     type Properties = Props;
 
@@ -130,7 +132,7 @@ impl Component for ReductionView {
     /// Render this component
     fn view(&self, ctx: &Context<Self>) -> Html {
 
-        log::debug!("render reduction main");
+        //log::debug!("render reduction main");
 
         let cb_mousemoved = ctx.link().callback(move |e: MouseEvent | { 
             e.prevent_default();
@@ -164,6 +166,7 @@ impl Component for ReductionView {
             <div style="display: flex; height: 500px; position: relative;">
 
                 <div style="position: absolute; left:0; top:0; display: flex; ">
+                    <br/>
                     <canvas 
                         ref={self.node_ref.clone()} 
                         style="border:1px solid #000000;"
@@ -174,7 +177,6 @@ impl Component for ReductionView {
                         height={format!{"{}", canvas_h}}
                     />
                 </div>
-
             </div>
         }
     }
@@ -191,6 +193,22 @@ impl Component for ReductionView {
 
         if let AsyncData::Loaded(treedata) = &async_treedata {
 
+            //Get list of selected strains
+            let mut list_strainid = Vec::new();
+            if let AsyncData::Loaded(tabledata) = &ctx.props().tabledata {
+                for onerow in &tabledata.rows {
+                    let strain_id = onerow.get(0).expect("no id column");
+                    list_strainid.push(strain_id.clone());
+                }
+            }
+            //log::debug!("strains in table {:?}",list_strainid);
+
+            //Figure out nodes to color
+            let list_sel_node = treedata.get_ids_from_names(&list_strainid);
+            //log::debug!("ids in table {:?}",list_strainid);
+            let list_color = treedata.select_common_ancestors(&list_sel_node);
+            //log::debug!("ids to color {:?}",list_color);
+
             //Fit camera whenever we get a new umap to show
             if &self.last_treedata != async_treedata {
 //                log::debug!(" fit_reduction ");
@@ -200,7 +218,7 @@ impl Component for ReductionView {
             }
 
 
-            log::debug!("camera {:?}", self.camera);
+            //log::debug!("camera {:?}", self.camera);
 
             // Only start the render loop if it's the first render
             // There's no loop cancellation taking place, so if multiple renders happen,
@@ -232,7 +250,7 @@ impl Component for ReductionView {
             let frag_code = include_str!("./umap.frag");
 
             //Get position data
-            let num_lines = treedata.gl_num_lines;
+            let num_lines = treedata.gl_num_lines as usize;
             let num_points = (num_lines*2) as usize;
             log::debug!("num_lines {}", num_lines);
             
@@ -241,16 +259,31 @@ impl Component for ReductionView {
             vec_vertex.reserve(num_points * vec_vertex_size);  
 
             //If we offset all colors to separate part of new array, we can do a memcpy instead
-            for i in 0..num_points {
-                let input_base = i*2;
+            for i in 0..num_lines {  //was num points
+                let input_base = i*4;
+                let node_id = treedata.vec_owner.get(i).expect("could not get vec owner");
+
+                let thecol = if list_color.contains(node_id) {
+                    (0.8, 0.06, 0.46)  // #cd1076
+                } else {
+                    (0.0, 0.0, 0.0)
+                };
 
                 vec_vertex.push(*treedata.vec_vertex.get(input_base+0).unwrap());
                 vec_vertex.push(*treedata.vec_vertex.get(input_base+1).unwrap());
                 vec_vertex.push(0.0); // only used for 3d reductions
+                
+                vec_vertex.push(thecol.0); 
+                vec_vertex.push(thecol.1); 
+                vec_vertex.push(thecol.2); 
 
-                vec_vertex.push(0.0); ///////////////////////////////////////////////// color index. remove, put in separate buffer
-                vec_vertex.push(0.0); ///////////////////////////////////////////////// color index. remove, put in separate buffer    filler for now
-                vec_vertex.push(0.0); ///////////////////////////////////////////////// color index. remove, put in separate buffer
+                vec_vertex.push(*treedata.vec_vertex.get(input_base+2).unwrap());
+                vec_vertex.push(*treedata.vec_vertex.get(input_base+3).unwrap());
+                vec_vertex.push(0.0); // only used for 3d reductions
+
+                vec_vertex.push(thecol.0); 
+                vec_vertex.push(thecol.1); 
+                vec_vertex.push(thecol.2); 
             }
 
             //Connect vertex array to GL
