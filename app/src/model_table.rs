@@ -161,7 +161,7 @@ impl Model {
                 let mut show_cols = Vec::new();
                 for (i,colname) in dt.columns.iter().enumerate() {
                     if self.show_columns.contains(colname) {
-                        log::debug!("show col: {}",colname);
+                        //log::debug!("show col: {}",colname);
                         show_cols.push(i);
                     }
                 }

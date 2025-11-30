@@ -29,7 +29,7 @@ type Vec3 = (f32,f32,f32);
 ////////////////////////////////////////////////////////////
 /// Message sent to the event system for updating the page
 #[derive(Debug)]
-pub enum MsgReduction {
+pub enum MsgTree {
     MouseMove(f32,f32, bool),
     MouseClick,
     MouseWheel(f32),
@@ -58,7 +58,7 @@ pub struct TreeView {
 }
 
 impl Component for TreeView {
-    type Message = MsgReduction;
+    type Message = MsgTree;
     type Properties = Props;
 
     ////////////////////////////////////////////////////////////
@@ -81,14 +81,14 @@ impl Component for TreeView {
 
             ////////////////////////////////////////////////////////////
             // Message: Propagate message to component above
-            MsgReduction::Propagate(msg) => {
+            MsgTree::Propagate(msg) => {
                 ctx.props().on_propagate.emit(msg);
                 false
             },
 
             ////////////////////////////////////////////////////////////
             // Message: Mouse has moved
-            MsgReduction::MouseMove(x,y, press_left) => {
+            MsgTree::MouseMove(x,y, press_left) => {
                 let last_pos = self.last_pos;
                 self.last_pos = (x,y);
                 //  log::debug!(".. {:?}", last_pos);
@@ -108,7 +108,7 @@ impl Component for TreeView {
 
             ////////////////////////////////////////////////////////////
             // Message: Mouse wheel rotated
-            MsgReduction::MouseWheel(dy) => {
+            MsgTree::MouseWheel(dy) => {
                 let (cx,cy) = self.last_pos;
                 let (wx, wy) = self.camera.cam2world(cx, cy);
                 let scale = (10.0f32).powf(dy / 100.0);
@@ -118,7 +118,7 @@ impl Component for TreeView {
 
             ////////////////////////////////////////////////////////////
             // Message: Mouse has clicked
-            MsgReduction::MouseClick => {
+            MsgTree::MouseClick => {
                 false
             },
 
@@ -139,17 +139,17 @@ impl Component for TreeView {
             let (x_cam, y_cam) = mouseevent_get_cx(&e);
             let press_left = e.buttons() & 1 > 0;
 
-            MsgReduction::MouseMove(x_cam,y_cam, press_left)
+            MsgTree::MouseMove(x_cam,y_cam, press_left)
             //there is mouse movement! https://developer.mozilla.org/en-US/docs/Web/API/MouseEvent/movementX 
         });
         
         let cb_mousewheel = ctx.link().callback(move |e: WheelEvent | { 
             e.prevent_default();
-            MsgReduction::MouseWheel(e.delta_y() as f32)
+            MsgTree::MouseWheel(e.delta_y() as f32)
         });
 
         let cb_mouseclicked = ctx.link().callback(move |_e: MouseEvent | { 
-            MsgReduction::MouseClick
+            MsgTree::MouseClick
         });
         
 
@@ -161,12 +161,19 @@ impl Component for TreeView {
         let canvas_h = 500 as usize; //(window_h*0.59) as usize;
 
 
-        //Compose the view
-        html! {
-            <div style="display: flex; height: 500px; position: relative;">
+        let async_treedata = &ctx.props().treedata;
 
-                <div style="position: absolute; left:0; top:0; display: flex; ">
-                    <br/>
+        let loading_message =match async_treedata {
+            AsyncData::NotLoaded => {
+                log::debug!("Loading tree");
+                ctx.link().send_message(MsgTree::Propagate(MsgCore::FetchTreeData));                
+                html!{<p>{"Tree not yet loaded. This can take a few seconds on Chrome"}</p>}
+            },
+            AsyncData::Loading => {
+                html!{<p>{"Tree is loading. This can take a few seconds on Chrome"}</p>}
+            },
+            AsyncData::Loaded(_treedata) => {
+                html!{
                     <canvas 
                         ref={self.node_ref.clone()} 
                         style="border:1px solid #000000;"
@@ -175,7 +182,17 @@ impl Component for TreeView {
                         onwheel={cb_mousewheel} 
                         width={format!{"{}", canvas_w}}
                         height={format!{"{}", canvas_h}}
-                    />
+                    />                    
+                }
+            }
+        };
+
+
+        //Compose the view
+        html! {
+            <div style="display: flex; height: 500px; position: relative;">
+                <div style="position: absolute; left:0; top:0; display: flex; ">
+                    {loading_message}
                 </div>
             </div>
         }

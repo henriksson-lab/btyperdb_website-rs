@@ -118,10 +118,7 @@ impl Component for Model {
         ctx.link().send_message(MsgCore::FetchDatabaseMetadata);
 
         //Get tree right away (or wait until tab open?)
-        ctx.link().send_message(MsgCore::FetchTreeData);
-
-//        let treedata = AsyncData::new(TreeLayout::new());
-        let treedata = AsyncData::NotLoaded;
+        //ctx.link().send_message(MsgCore::FetchTreeData);
         
         Self {
             current_page: CurrentPage::Home,
@@ -139,7 +136,7 @@ impl Component for Model {
 
             last_component_size: ComponentSize { width: 100.0, height: 100.0 },
             
-            treedata: treedata,
+            treedata: AsyncData::NotLoaded,
 
         }
     }
@@ -488,7 +485,37 @@ impl Component for Model {
                     //log::debug!("now cols: {:?}", self.show_columns);
                 }
                 true
-            },            
+            },      
+
+
+            /* 
+            ////////////////////////////////////////////////////////////
+            // x
+            MsgCore::OpenBTracker => {
+
+//                let url = "https://nextstrain.org/community/vigzy77/BTracker/Bacillus-cereus-group/All-Species?s=BTDB_2025-0001840.1,BTDB_2025-0006982.1";
+
+                let document = window().expect("no window").document().expect("no document on window");
+
+
+                let el_form:HtmlFormElement = document.create_element("form").expect("could not create element").dyn_into().unwrap();
+                el_form.set_target("_blank");
+                el_form.set_method("post");
+                el_form.set_action("https://nextstrain.org/community/vigzy77/BTracker/Bacillus-cereus-group/All-Species");
+
+                let el_input:HtmlInputElement = document.create_element("input").expect("could not create element").dyn_into().unwrap();
+                el_input.set_type("hidden");
+                el_input.set_name("s");
+                el_input.set_value("BTDB_2025-0001840.1,BTDB_2025-0006982.1");
+
+                el_form.append_child(&el_input).expect("fail to add element");
+
+                el_form.submit().expect("Failed to submit form");
+            
+
+                false
+            }      
+            */
         }
     }
 

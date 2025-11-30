@@ -32,6 +32,8 @@ features = [
   'CanvasRenderingContext2d',
   'DomRect',
   'HtmlCanvasElement',
+  'HtmlFormElement',
+  'HtmlInputElement',
   'HtmlSelectElement',
   'HtmlIFrameElement',
   'SvgElement',

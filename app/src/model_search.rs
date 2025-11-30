@@ -186,6 +186,12 @@ impl Model {
 
         let visibility=self.show_search_controls;
 
+        
+
+
+        //Get list of selected strains
+        let list_strains_withcomma = self.selected_strains.iter().map(|x| x.to_string()).collect::<Vec<_>>().join(",");
+
         //// Generate HTML: total search pane
         html! {
             <div>
@@ -220,6 +226,14 @@ impl Model {
                     <button class="buttonspacer" onclick={ctx.link().callback(move |_e | {MsgCore::DownloadMetadata(IncludeData::All)})}>
                         {"Metadata: Download displayed"}
                     </button>
+
+                    
+                    <form target="_blank" method="get" action="https://nextstrain.org/community/vigzy77/BTracker/Bacillus-cereus-group/All-Species">
+                        <input type="hidden" name="s" value={list_strains_withcomma.clone()}/>
+                        <button class="buttonspacer" disabled={list_strains_withcomma.is_empty()}>
+                            {"Open selected in BTracker"}
+                        </button>
+                    </form>
                 </div>
 
             </div>

@@ -44,12 +44,12 @@ impl Model {
 
         html! {
             <div>
-            <div class="App-divider">{"Statistics"}</div>
-            <div class="landingdiv">
-                {html_stats}
-                {""}                
-            </div>
-            <br />
+                <div class="App-divider">{"Statistics"}</div>
+                <div class="landingdiv">
+                    {html_stats}
+                    {""}                
+                </div>
+                <br />
             </div>        
         }
         

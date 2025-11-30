@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap};
 use serde::{Deserialize, Serialize, Serializer, de};
 
 type DatabaseHistogram = Vec<(String,i32)>;
@@ -252,3 +252,141 @@ pub struct Test {
     pub data: SimpleRootedTree<String, f32, f32>,
 
 } */
+
+
+/* 
+
+////////////////////////////////////////////////////////////
+/// 
+#[derive(Debug, Deserialize, Serialize)]
+pub struct SerializableTree {
+
+    /// Root NodeID
+    pub root: NodeID,
+    /// Nodes of the tree
+    pub nodes: Vec<Option<Node<String, f32, f32>>>,
+    /// Index of nodes by taxa
+    pub taxa_node_id_map: HashMap<String, NodeID>,
+
+    /*    
+    /// Field to hold precomputed euler tour for constant-time LCA queries
+    pub precomputed_euler: Option<Vec<NodeID>>,
+    /// Field to hold precomputed first-appearance for constant-time LCA queries
+    pub precomputed_fai: Option<Vec<Option<usize>>>,
+    /// Field to hold precomputed depth-array for constant-time LCA queries
+    pub precomputed_da: Option<Vec<usize>>,
+
+    // Field to hold precomputed range-minimum-query for constant-time LCA queries
+    // pub precomputed_rmq: Option<BinaryRmq>,
+    */
+}
+impl SerializableTree {
+
+
+    ////////////////////////////////////////////////////////////
+    /// 
+    pub fn to_serialize(tree: SimpleRootedTree<String, f32, f32>) -> SerializableTree {
+
+        SerializableTree {
+            root: tree.root, 
+            nodes: tree.nodes,
+            taxa_node_id_map: tree.taxa_node_id_map,
+        }
+    }
+
+
+    ////////////////////////////////////////////////////////////
+    /// 
+    pub fn from_serialize(tree: SimpleRootedTree<String, f32, f32>) -> SerializableTree {
+
+
+        let ser_tree: SimpleRootedTree<String, f32, f32> = SimpleRootedTree {
+            root: tree.root, 
+            nodes: tree.nodes,
+            taxa_node_id_map: tree.taxa_node_id_map,
+            
+            precomputed_euler: None,
+            precomputed_fai: None,
+            precomputed_da: None,
+            precomputed_rmq: None,                
+        };
+    }
+
+
+
+}
+
+
+
+pub fn serialize_tree(tree: SimpleRootedTree<String, f32, f32>) {
+
+
+    let ser_tree: SimpleRootedTree<String, f32, f32> = SimpleRootedTree {
+        root: tree.root, 
+        nodes: tree.nodes,
+        taxa_node_id_map: tree.taxa_node_id_map,
+        
+        precomputed_euler: None,
+        precomputed_fai: None,
+        precomputed_da: None,
+        precomputed_rmq: None,                
+    };
+}
+
+
+pub fn unserialize_tree() {
+
+//    let tree: SimpleRootedTree<String, f32, f32> = SimpleRootedTree::new(root_id);
+
+
+}
+
+
+
+#[derive(Clone, Deserialize, Serialize)]
+pub struct SerializeNode 
+{
+    /// A unique identifier for a node
+    id: NodeID,
+    /// A link to the node parent (set to None for root)
+    parent: Option<NodeID>,
+    /// Children of node
+    children: Vec<NodeID>,
+    /// Taxa annotation of node
+    taxa: Option<String>,
+    /// Weight of edge ending in node
+    weight: Option<f32>,
+    /// Real number annotation of node (used by some algorithms)
+    zeta: Option<f32>,
+}
+impl SerializeNode {
+
+
+    pub fn from_serialize(n: Node<String, f32, f32>) -> SerializeNode {
+        SerializeNode {
+            id: n.get_id(),
+            parent: n.get_parent(),
+            children: n.get_children().collect(),
+            taxa: n.get_taxa().cloned(),
+            weight: n.get_weight(),
+            zeta: n.get_zeta(),
+        }
+    }
+
+
+    pub fn to_serialize(n: SerializeNode) -> Node<String, f32, f32> {
+        Node {
+            id: n.id,
+            parent: n.parent,
+            children: n.children,
+            taxa: n.taxa,
+            weight: n.weight,
+            zeta: n.zeta,
+        }
+    }
+
+    
+
+}
+
+*/

@@ -30,6 +30,7 @@ impl Model {
         html! {
             <div>
                 <div> 
+                    <div class="App-divider">{"Tree view"}</div>
                     <TreeView 
 //                        on_cell_hovered={on_cell_hovered} 
 //                        on_cell_clicked={on_cell_clicked} 
