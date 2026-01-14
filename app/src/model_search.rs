@@ -53,13 +53,14 @@ impl Model {
 
                 let elem_input = html! { <input class="textbox" type="text" name="value" value={v.clone()} onchange={oninput_like} list={crit.field.clone()}/> };
 
+                //Check if we should generate a drop-down for this value
                 if let Some(list_dropdown) = metadata.column_dropdown.get(&crit.field) {
-                    //This ite has a suggested list of value via a dropdown
+                    //This item has a suggested list of value via a dropdown
                     html! {
                         <label>
                             {" Is: "}
                             { elem_input }
-                            <datalist>
+                            <datalist id={crit.field.clone()}>
                             {
                                 list_dropdown.iter().map(|val| { 
                                     html!{
@@ -74,6 +75,7 @@ impl Model {
                     }
 
                 } else {
+                    //No dropdown
                     html! {
                         <label>
                             {" Is: "}

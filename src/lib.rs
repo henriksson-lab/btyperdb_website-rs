@@ -175,7 +175,7 @@ impl SearchSettings {
 
 
 ////////////////////////////////////////////////////////////
-/// 
+/// One search criterion, e.g. a field should be <>= or like some value
 #[derive(Debug, Serialize, Deserialize, Eq, PartialEq, Clone)]
 pub struct SearchCriteria {
     pub field: String,
@@ -185,7 +185,7 @@ impl SearchCriteria {
 
 
     ////////////////////////////////////////////////////////////
-    /// 
+    /// Constructor
     pub fn new() -> SearchCriteria {
         SearchCriteria {
             field: "".to_string(),
@@ -195,7 +195,7 @@ impl SearchCriteria {
 
 
     ////////////////////////////////////////////////////////////
-    /// 
+    /// Genereate the default search criterion
     pub fn default_search(col: &DatabaseColumn) -> SearchCriteria {
         let comp = ComparisonType::default_comparison(col);
         SearchCriteria {
@@ -207,7 +207,7 @@ impl SearchCriteria {
 
 
 ////////////////////////////////////////////////////////////
-/// 
+/// A type of comparison for a field
 #[derive(Debug, Serialize, Deserialize, Eq, PartialEq, Clone)]
 pub enum ComparisonType {
     Like(String),

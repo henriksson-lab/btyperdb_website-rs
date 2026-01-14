@@ -140,8 +140,10 @@ pub fn read_database_metadata (
 
         /////////// Drop-down values for relevant fields  --- detect from metadata file?
         if record.dropdown {
-            //let col = record.column_id;//.to_string();
-            list_dropdown.insert(record.column_id.clone(), query_dropdown(conn, &record.column_id).expect("Failed to create dropdown"));        
+            list_dropdown.insert(
+                record.column_id.clone(), 
+                query_dropdown(conn, &record.column_id
+            ).expect("Failed to create dropdown"));        
         }
 
         outlist.insert(record.column_id.clone(), record);
