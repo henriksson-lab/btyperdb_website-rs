@@ -192,7 +192,8 @@ impl Model {
 
 
         //Get list of selected strains
-        let list_strains_withcomma = self.selected_strains.iter().map(|x| x.to_string()).collect::<Vec<_>>().join(",");
+        //let list_strains_withcomma = self.selected_strains.iter().map(|x| x.to_string()).collect::<Vec<_>>().join(",");
+        //log::debug!("update search pane");
 
         //// Generate HTML: total search pane
         html! {
@@ -229,13 +230,17 @@ impl Model {
                         {"Metadata: Download displayed"}
                     </button>
 
-                    
-                    <form target="_blank" method="get" action="https://nextstrain.org/community/vigzy77/BTracker/Bacillus-cereus-group/All-Species">
-                        <input type="hidden" name="s" value={list_strains_withcomma.clone()}/>
-                        <button class="buttonspacer" disabled={list_strains_withcomma.is_empty()}>
+                    <button class="buttonspacer" onclick={ctx.link().callback(move |_e | {MsgCore::DownloadMetadata(IncludeData::All)})}>
+                        {"Metadata: Download displayed"}
+                    </button>
+
+                    // https://nextstrain.org/community/vigzy77/BTracker/Bacillus-cereus-group/All-Species
+//                    <form target="_blank" method="get" action="https://nextstrain.org/community/vigzy77/BTracker/Bacillus-cereus-group/All-Species(Mash-distance-NJ)">
+  //                      <input type="hidden" name="s" value={list_strains_withcomma.clone()}/>
+                        <button class="buttonspacer" onclick={ctx.link().callback(move |_e | {MsgCore::OpenBTracker})} type="button"> 
                             {"Open selected in BTracker"}
                         </button>
-                    </form>
+    //                </form>
                 </div>
 
             </div>

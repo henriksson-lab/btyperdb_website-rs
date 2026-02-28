@@ -12,6 +12,9 @@ use geojson::GeoJson;
 
 
 use my_web_app::TreeData;
+use wasm_bindgen::JsCast;
+use web_sys::HtmlFormElement;
+use web_sys::HtmlInputElement;
 use web_sys::window;
 use yew::prelude::*;
 
@@ -76,6 +79,8 @@ pub enum MsgCore {
 
     HideColumn(String),
     ShowColumn(String),
+
+    OpenBTracker,
 }
 
 
@@ -488,34 +493,21 @@ impl Component for Model {
             },      
 
 
-            /* 
             ////////////////////////////////////////////////////////////
             // x
             MsgCore::OpenBTracker => {
 
-//                let url = "https://nextstrain.org/community/vigzy77/BTracker/Bacillus-cereus-group/All-Species?s=BTDB_2025-0001840.1,BTDB_2025-0006982.1";
-
-                let document = window().expect("no window").document().expect("no document on window");
-
-
-                let el_form:HtmlFormElement = document.create_element("form").expect("could not create element").dyn_into().unwrap();
-                el_form.set_target("_blank");
-                el_form.set_method("post");
-                el_form.set_action("https://nextstrain.org/community/vigzy77/BTracker/Bacillus-cereus-group/All-Species");
-
-                let el_input:HtmlInputElement = document.create_element("input").expect("could not create element").dyn_into().unwrap();
-                el_input.set_type("hidden");
-                el_input.set_name("s");
-                el_input.set_value("BTDB_2025-0001840.1,BTDB_2025-0006982.1");
-
-                el_form.append_child(&el_input).expect("fail to add element");
-
-                el_form.submit().expect("Failed to submit form");
-            
-
+                let window = window().expect("no window");
+                log::debug!("btracker with strains {:?}", self.selected_strains);
+                if self.selected_strains.is_empty() {
+                    window.alert_with_message("No strains specified").expect("failed to alert");
+                } else {
+                    let list_strains_withcomma = self.selected_strains.iter().map(|x| x.to_string()).collect::<Vec<_>>().join(",");
+                    let url = format!("https://nextstrain.org/community/vigzy77/BTracker/Bacillus-cereus-group/All-Species(Mash-distance-NJ)?s={}",list_strains_withcomma);
+                    window.open_with_url_and_target(url.as_str(),"_blank").expect("Failed to open url");
+                }
                 false
             }      
-            */
         }
     }
 

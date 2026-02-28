@@ -165,6 +165,18 @@ impl Model {
 
 
 
+    ////////////////////////////////////////////////////////////
+    /// Open a URL
+    /// 
+    pub fn open_url(&self, url: &str){
+        let window = window().expect("no window");
+        let document = window.document().expect("should have a document on window");
+        let a:HtmlElement = document.create_element("a").expect("could not create a").dyn_into().unwrap();
+        a.set_attribute("href", &url).expect("Could not set attribute");
+        a.click();
+    }
+
+
 
     
 }
