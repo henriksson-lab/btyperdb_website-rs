@@ -52,6 +52,8 @@ pub async fn strainfasta(server_data: Data<Mutex<ServerData>>, req_body: web::Js
             let fname_outer = format!("{}.fna.gz", f);
             let file_path = path_fna.join(&fname_outer);
 
+            println!("Adding file to zip: {:?}", file_path);
+
             //Future option: if each file already zipped, could directly concatenate their contents
             let mut file = File::open(file_path).await.unwrap();
             archive

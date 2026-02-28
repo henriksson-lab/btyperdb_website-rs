@@ -12,9 +12,6 @@ use geojson::GeoJson;
 
 
 use my_web_app::TreeData;
-use wasm_bindgen::JsCast;
-use web_sys::HtmlFormElement;
-use web_sys::HtmlInputElement;
 use web_sys::window;
 use yew::prelude::*;
 
