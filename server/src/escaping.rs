@@ -14,7 +14,7 @@ pub fn sql_stringarg_to_num(s: &String) -> String {
 pub fn sql_stringarg_escape(s: &String) -> String {
     let mut out =String::new();
     for c in s.chars() {
-        if c.is_ascii_alphanumeric() || c.is_whitespace() || c=='-' || c=='_' || c=='.' || c==',' {
+        if c.is_ascii_alphanumeric() || c.is_whitespace() || c=='-' || c=='_' || c=='.' || c==',' || c==':' {
             out.push(c);
         } else {
             println!("!!!!!!!!!!! unhandled char {}",c);
