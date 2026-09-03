@@ -47,11 +47,7 @@ impl Component for ComponentSizeObserver {
         false
     }
 
-    fn changed(
-        &mut self,
-        ctx: &Context<Self>,
-        old_props: &Self::Properties,
-    ) -> bool  {
+    fn changed(&mut self, ctx: &Context<Self>, old_props: &Self::Properties) -> bool {
         let props = ctx.props();
         if props != old_props {
             self.add_resize_listener(ctx);
@@ -60,8 +56,7 @@ impl Component for ComponentSizeObserver {
             false
         }
     }
- 
-    
+
     fn view(&self, _ctx: &Context<Self>) -> Html {
         html! {
             <iframe style={IFRAME_STYLE} ref={self.iframe_ref.clone()} />
@@ -75,12 +70,7 @@ impl Component for ComponentSizeObserver {
     }
 }
 
-
-
-
 impl ComponentSizeObserver {
-
-
     fn add_resize_listener(&mut self, ctx: &Context<Self>) {
         let iframe = self.iframe_ref.cast::<HtmlIFrameElement>().unwrap();
         let window = iframe.content_window().unwrap();

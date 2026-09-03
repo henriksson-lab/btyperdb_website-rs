@@ -2,9 +2,7 @@ use crate::core_model::*;
 
 use yew::prelude::*;
 
-
 impl Model {
-
     ////////////////////////////////////////////////////////////
     /// Page: Help
     pub fn view_help_pane(&self, _ctx: &Context<Self>) -> Html {
@@ -24,8 +22,6 @@ impl Model {
             </div>
             <br />
             </div>
-        }        
+        }
     }
-
-
 }

@@ -1,18 +1,15 @@
-
 use my_web_app::TableData;
 use wasm_bindgen::JsCast;
 use web_sys::window;
 use web_sys::{DomRect, EventTarget, HtmlCanvasElement, WebGlRenderingContext as GL};
-use yew::{html, Callback, Component, Context, Html, MouseEvent, NodeRef, WheelEvent};
 use yew::Properties;
+use yew::{html, Callback, Component, Context, Html, MouseEvent, NodeRef, WheelEvent};
 
 use crate::appstate::AsyncData;
 use crate::core_model::MsgCore;
-use crate::treeview::Camera2D;
 use crate::resize::ComponentSize;
 use crate::treeview::treelayout::TreeLayout;
-
-
+use crate::treeview::Camera2D;
 
 ////////////////////////////////////////////////////////////
 /// RGB color, 0...1
@@ -20,22 +17,17 @@ use crate::treeview::treelayout::TreeLayout;
 
 ////////////////////////////////////////////////////////////
 /// Vectors, 3d and 4d
-type Vec3 = (f32,f32,f32);
-
-
-
-
+type Vec3 = (f32, f32, f32);
 
 ////////////////////////////////////////////////////////////
 /// Message sent to the event system for updating the page
 #[derive(Debug)]
 pub enum MsgTree {
-    MouseMove(f32,f32, bool),
+    MouseMove(f32, f32, bool),
     MouseClick,
     MouseWheel(f32),
     Propagate(MsgCore),
 }
-
 
 ////////////////////////////////////////////////////////////
 /// Properties for ReductionView
@@ -47,12 +39,11 @@ pub struct Props {
     pub tabledata: AsyncData<TableData>,
 }
 
-
 ////////////////////////////////////////////////////////////
 /// random note: Wrap gl in Rc (Arc for multi-threaded) so it can be injected into the render-loop closure.
 pub struct TreeView {
     node_ref: NodeRef,
-    last_pos: (f32,f32),
+    last_pos: (f32, f32),
     camera: Camera2D,
     last_treedata: AsyncData<TreeLayout>,
 }
@@ -66,31 +57,28 @@ impl Component for TreeView {
     fn create(_ctx: &Context<Self>) -> Self {
         Self {
             node_ref: NodeRef::default(),
-            last_pos: (0.0,0.0),
+            last_pos: (0.0, 0.0),
             camera: Camera2D::new(),
-            last_treedata: AsyncData::NotLoaded
+            last_treedata: AsyncData::NotLoaded,
         }
     }
-
 
     ////////////////////////////////////////////////////////////
     /// Handle an update message
     fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
-        match msg {            
-
-
+        match msg {
             ////////////////////////////////////////////////////////////
             // Message: Propagate message to component above
             MsgTree::Propagate(msg) => {
                 ctx.props().on_propagate.emit(msg);
                 false
-            },
+            }
 
             ////////////////////////////////////////////////////////////
             // Message: Mouse has moved
-            MsgTree::MouseMove(x,y, press_left) => {
+            MsgTree::MouseMove(x, y, press_left) => {
                 let last_pos = self.last_pos;
-                self.last_pos = (x,y);
+                self.last_pos = (x, y);
                 //  log::debug!(".. {:?}", last_pos);
 
                 //Handle panning
@@ -104,89 +92,88 @@ impl Component for TreeView {
                 }
 
                 false
-            },
+            }
 
             ////////////////////////////////////////////////////////////
             // Message: Mouse wheel rotated
             MsgTree::MouseWheel(dy) => {
-                let (cx,cy) = self.last_pos;
+                let (cx, cy) = self.last_pos;
                 let (wx, wy) = self.camera.cam2world(cx, cy);
                 let scale = (10.0f32).powf(dy / 100.0);
-                self.camera.zoom_around(wx,wy, scale);
+                self.camera.zoom_around(wx, wy, scale);
                 true
-            },
+            }
 
             ////////////////////////////////////////////////////////////
             // Message: Mouse has clicked
-            MsgTree::MouseClick => {
-                false
-            },
-
+            MsgTree::MouseClick => false,
         }
     }
-
-
-
 
     ////////////////////////////////////////////////////////////
     /// Render this component
     fn view(&self, ctx: &Context<Self>) -> Html {
-
         //log::debug!("render reduction main");
 
-        let cb_mousemoved = ctx.link().callback(move |e: MouseEvent | { 
+        let cb_mousemoved = ctx.link().callback(move |e: MouseEvent| {
             e.prevent_default();
             let (x_cam, y_cam) = mouseevent_get_cx(&e);
             let press_left = e.buttons() & 1 > 0;
 
-            MsgTree::MouseMove(x_cam,y_cam, press_left)
-            //there is mouse movement! https://developer.mozilla.org/en-US/docs/Web/API/MouseEvent/movementX 
+            MsgTree::MouseMove(x_cam, y_cam, press_left)
+            //there is mouse movement! https://developer.mozilla.org/en-US/docs/Web/API/MouseEvent/movementX
         });
-        
-        let cb_mousewheel = ctx.link().callback(move |e: WheelEvent | { 
+
+        let cb_mousewheel = ctx.link().callback(move |e: WheelEvent| {
             e.prevent_default();
             MsgTree::MouseWheel(e.delta_y() as f32)
         });
 
-        let cb_mouseclicked = ctx.link().callback(move |_e: MouseEvent | { 
-            MsgTree::MouseClick
-        });
-        
+        let cb_mouseclicked = ctx
+            .link()
+            .callback(move |_e: MouseEvent| MsgTree::MouseClick);
 
         //Compute current canvas size. Not automatic via CSS
-        let window = window().expect("no window");//.document().expect("no document on window");
-        let _window_h = window.inner_height().expect("failed to get height").as_f64().unwrap();
-        let window_w = window.inner_width().expect("failed to get width").as_f64().unwrap();
-        let canvas_w = (window_w*0.99) as usize;
+        let window = window().expect("no window"); //.document().expect("no document on window");
+        let _window_h = window
+            .inner_height()
+            .expect("failed to get height")
+            .as_f64()
+            .unwrap();
+        let window_w = window
+            .inner_width()
+            .expect("failed to get width")
+            .as_f64()
+            .unwrap();
+        let canvas_w = (window_w * 0.99) as usize;
         let canvas_h = 500 as usize; //(window_h*0.59) as usize;
-
 
         let async_treedata = &ctx.props().treedata;
 
-        let loading_message =match async_treedata {
+        let loading_message = match async_treedata {
             AsyncData::NotLoaded => {
                 log::debug!("Loading tree");
-                ctx.link().send_message(MsgTree::Propagate(MsgCore::FetchTreeData));                
-                html!{<p>{"Tree not yet loaded. This can take a few seconds on Chrome"}</p>}
-            },
+                ctx.link()
+                    .send_message(MsgTree::Propagate(MsgCore::FetchTreeData));
+                html! {<p>{"Tree not yet loaded. This can take a few seconds on Chrome"}</p>}
+            }
             AsyncData::Loading => {
-                html!{<p>{"Tree is loading. This can take a few seconds on Chrome"}</p>}
-            },
+                html! {<p>{"Tree is loading. This can take a few seconds on Chrome"}</p>}
+            }
             AsyncData::Loaded(_treedata) => {
-                html!{
-                    <canvas 
-                        ref={self.node_ref.clone()} 
+                html! {
+                    <canvas
+                        ref={self.node_ref.clone()}
                         style="border:1px solid #000000;"
-                        onmousemove={cb_mousemoved} 
-                        onclick={cb_mouseclicked} 
-                        onwheel={cb_mousewheel} 
+                        onmousemove={cb_mousemoved}
+                        onclick={cb_mouseclicked}
+                        onwheel={cb_mousewheel}
                         width={format!{"{}", canvas_w}}
                         height={format!{"{}", canvas_h}}
-                    />                    
+                    />
                 }
             }
         };
-
 
         //Compose the view
         html! {
@@ -198,18 +185,12 @@ impl Component for TreeView {
         }
     }
 
-
-
-
-
     ////////////////////////////////////////////////////////////
     /// Called after DOM has been created
     fn rendered(&mut self, ctx: &Context<Self>, _first_render: bool) {
-
         let async_treedata = &ctx.props().treedata;
 
         if let AsyncData::Loaded(treedata) = &async_treedata {
-
             //Get list of selected strains
             let mut list_strainid = Vec::new();
             if let AsyncData::Loaded(tabledata) = &ctx.props().tabledata {
@@ -228,12 +209,11 @@ impl Component for TreeView {
 
             //Fit camera whenever we get a new umap to show
             if &self.last_treedata != async_treedata {
-//                log::debug!(" fit_reduction ");
+                //                log::debug!(" fit_reduction ");
                 self.camera.fit_reduction(&treedata.get_bounding_rect());
-//                self.camera.zoom_x *= 2.0;
+                //                self.camera.zoom_x *= 2.0;
                 self.last_treedata = async_treedata.clone();
             }
-
 
             //log::debug!("camera {:?}", self.camera);
 
@@ -249,7 +229,6 @@ impl Component for TreeView {
                 return;
             }
             */
-            
 
             // Once rendered, store references for the canvas and GL context. These can be used for
             // resizing the rendering area when the window or canvas element are resized, as well as
@@ -268,39 +247,40 @@ impl Component for TreeView {
 
             //Get position data
             let num_lines = treedata.gl_num_lines as usize;
-            let num_points = (num_lines*2) as usize;
+            let num_points = (num_lines * 2) as usize;
             log::debug!("num_lines {}", num_lines);
-            
-            let mut vec_vertex:Vec<f32> = Vec::new();
+
+            let mut vec_vertex: Vec<f32> = Vec::new();
             let vec_vertex_size = 6; //Size of vec3+vec3    /// overkill!!
-            vec_vertex.reserve(num_points * vec_vertex_size);  
+            vec_vertex.reserve(num_points * vec_vertex_size);
 
             //If we offset all colors to separate part of new array, we can do a memcpy instead
-            for i in 0..num_lines {  //was num points
-                let input_base = i*4;
+            for i in 0..num_lines {
+                //was num points
+                let input_base = i * 4;
                 let node_id = treedata.vec_owner.get(i).expect("could not get vec owner");
 
                 let thecol = if list_color.contains(node_id) {
-                    (0.8, 0.06, 0.46)  // #cd1076
+                    (0.8, 0.06, 0.46) // #cd1076
                 } else {
                     (0.0, 0.0, 0.0)
                 };
 
-                vec_vertex.push(*treedata.vec_vertex.get(input_base+0).unwrap());
-                vec_vertex.push(*treedata.vec_vertex.get(input_base+1).unwrap());
-                vec_vertex.push(0.0); // only used for 3d reductions
-                
-                vec_vertex.push(thecol.0); 
-                vec_vertex.push(thecol.1); 
-                vec_vertex.push(thecol.2); 
-
-                vec_vertex.push(*treedata.vec_vertex.get(input_base+2).unwrap());
-                vec_vertex.push(*treedata.vec_vertex.get(input_base+3).unwrap());
+                vec_vertex.push(*treedata.vec_vertex.get(input_base + 0).unwrap());
+                vec_vertex.push(*treedata.vec_vertex.get(input_base + 1).unwrap());
                 vec_vertex.push(0.0); // only used for 3d reductions
 
-                vec_vertex.push(thecol.0); 
-                vec_vertex.push(thecol.1); 
-                vec_vertex.push(thecol.2); 
+                vec_vertex.push(thecol.0);
+                vec_vertex.push(thecol.1);
+                vec_vertex.push(thecol.2);
+
+                vec_vertex.push(*treedata.vec_vertex.get(input_base + 2).unwrap());
+                vec_vertex.push(*treedata.vec_vertex.get(input_base + 3).unwrap());
+                vec_vertex.push(0.0); // only used for 3d reductions
+
+                vec_vertex.push(thecol.0);
+                vec_vertex.push(thecol.1);
+                vec_vertex.push(thecol.2);
             }
 
             //Connect vertex array to GL
@@ -315,7 +295,6 @@ impl Component for TreeView {
             gl.shader_source(&vert_shader, vert_code.as_str());
             gl.compile_shader(&vert_shader);
 
-            
             /*let msg= gl.get_shader_info_log(&vert_shader);
             if let Some(msg)=msg {
                 log::debug!("error {}", msg);
@@ -340,26 +319,19 @@ impl Component for TreeView {
             let a_position = gl.get_attrib_location(&shader_program, "a_position") as u32;
             //log::debug!("a_position {}",a_position);
             gl.enable_vertex_attrib_array(a_position);
-            gl.vertex_attrib_pointer_with_i32(
-                a_position, 
-                3, 
-                GL::FLOAT, 
-                false, 
-                sizeof_float*6, 
-                0
-            );
+            gl.vertex_attrib_pointer_with_i32(a_position, 3, GL::FLOAT, false, sizeof_float * 6, 0);
 
             //Attach color vector as an attribute
             let a_color = gl.get_attrib_location(&shader_program, "a_color") as u32;
             //log::debug!("a_color {}",a_color);
             gl.enable_vertex_attrib_array(a_color);
             gl.vertex_attrib_pointer_with_i32(
-                a_color, 
+                a_color,
                 3,
-                GL::FLOAT, 
-                false, 
-                sizeof_float * 6, 
-                sizeof_float * 3
+                GL::FLOAT,
+                false,
+                sizeof_float * 6,
+                sizeof_float * 3,
             );
 
             //Attach camera attributes
@@ -382,55 +354,48 @@ impl Component for TreeView {
             // clear canvas
             gl.clear_color(1.0, 1.0, 1.0, 1.0);
             gl.clear(GL::COLOR_BUFFER_BIT);
-            
+
             // to make round points, need to draw square https://stackoverflow.com/questions/7237086/opengl-es-2-0-equivalent-for-es-1-0-circles-using-gl-point-smooth
             gl.draw_arrays(GL::LINES, 0, num_points as i32);
-        } 
+        }
     }
 }
-
-
-
-
 
 ////////////////////////////////////////////////////////////
 /// Convert from vector to HTML color code
 pub fn rgbvec2string(c: Vec3) -> String {
-    let red=(c.0*255.0) as u8;
-    let green=(c.1*255.0) as u8;
-    let blue=(c.2*255.0) as u8;
+    let red = (c.0 * 255.0) as u8;
+    let green = (c.1 * 255.0) as u8;
+    let blue = (c.2 * 255.0) as u8;
     format!("#{:02X}{:02X}{:02X}", red, green, blue)
 }
 
-
-
 ////////////////////////////////////////////////////////////
 /// Get current camera position from a mouse event
-fn mouseevent_get_cx(e: &MouseEvent) -> (f32,f32) {
+fn mouseevent_get_cx(e: &MouseEvent) -> (f32, f32) {
     let target: Option<EventTarget> = e.target();
-    let canvas: HtmlCanvasElement = target.and_then(|t| t.dyn_into::<HtmlCanvasElement>().ok()).expect("wrong type");
+    let canvas: HtmlCanvasElement = target
+        .and_then(|t| t.dyn_into::<HtmlCanvasElement>().ok())
+        .expect("wrong type");
 
-    let rect:DomRect = canvas.get_bounding_client_rect();
+    let rect: DomRect = canvas.get_bounding_client_rect();
     let x = e.client_x() - (rect.left() as i32);
     let y = e.client_y() - (rect.top() as i32);
 
     let w = rect.width() as f32;
     let h = rect.height() as f32;
 
-    let x_cam = (x as f32 - w/2.0)/(w/2.0);
-    let y_cam = (y as f32 - h/2.0)/(h/2.0);
+    let x_cam = (x as f32 - w / 2.0) / (w / 2.0);
+    let y_cam = (y as f32 - h / 2.0) / (h / 2.0);
 
-//    log::debug!("getcx  {} {}", x_cam, y_cam);
+    //    log::debug!("getcx  {} {}", x_cam, y_cam);
 
     (x_cam, y_cam)
 }
 
-
-
 ////////////////////////////////////////////////////////////
 /// Read color RGB vector from html string to 0..255
 pub fn parse_rgb_i64(s: &String) -> (i64, i64, i64) {
-
     let s = s.as_str();
     let s_r = s.get(1..3).expect("Could not get R");
     let s_g = s.get(3..5).expect("Could not get G");
@@ -441,17 +406,12 @@ pub fn parse_rgb_i64(s: &String) -> (i64, i64, i64) {
     let g = i64::from_str_radix(s_g, 16).expect("parse error");
     let b = i64::from_str_radix(s_b, 16).expect("parse error");
 
-    (r,g,b)
+    (r, g, b)
 }
-
 
 ////////////////////////////////////////////////////////////
 /// Read color RGB vector from html string to 0..1
 pub fn parse_rgb_f64(s: &String) -> (f32, f32, f32) {
-    let (r,g,b) = parse_rgb_i64(s);
-    (
-        r as f32 / 255.0,
-        g as f32 / 255.0,
-        b as f32 / 255.0,
-    )
+    let (r, g, b) = parse_rgb_i64(s);
+    (r as f32 / 255.0, g as f32 / 255.0, b as f32 / 255.0)
 }

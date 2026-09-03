@@ -3,11 +3,9 @@ use crate::core_model::*;
 use yew::prelude::*;
 
 impl Model {
-
     ////////////////////////////////////////////////////////////
     /// x
     pub fn view_about_pane(&self, _ctx: &Context<Self>) -> Html {
-
         html! {
             <div>
                 <div class="App-divider">
@@ -26,7 +24,7 @@ impl Model {
                             <a href="https://www.tandfonline.com/doi/full/10.1080/10408398.2021.1916735">
                                 <i>
                                     {"Bacillus cereus"}
-                                </i> 
+                                </i>
                                 {" group genomes"}
                             </a>
                             {". We developed BTyperDB because we noticed that existing pathogen genome databases were inadequate–and "}
@@ -48,7 +46,7 @@ impl Model {
                             <i>
                                 {"B. cereus"}
                             </i>
-                            {"group genomes! For version 1 (v1) of the database, our curation team spent thousands of hours manually curating and standardizing metadata for every single genome (nearly 6k genomes total)."} 
+                            {"group genomes! For version 1 (v1) of the database, our curation team spent thousands of hours manually curating and standardizing metadata for every single genome (nearly 6k genomes total)."}
                         </p>
                         <p>
                             {"For version 2 (v2) of the database, we wanted to give "}
@@ -59,7 +57,7 @@ impl Model {
                             <i>
                                 {"B. cereus"}
                             </i>
-                            {"group (meta)data generators, and dozens have already contrbuted by validating, correcting, and/or contributing novel metadata. Some even dontated novel genomes, and so far, we've received hundreds of novel, unpublished "} 
+                            {"group (meta)data generators, and dozens have already contrbuted by validating, correcting, and/or contributing novel metadata. Some even dontated novel genomes, and so far, we've received hundreds of novel, unpublished "}
                             <i>
                                 {"B. cereus"}
                             </i>
@@ -80,7 +78,7 @@ impl Model {
                             {"Ramnath, et al. 2023. A community-curated, global atlas of "}
                             <i>
                                 {"Bacillus cereus sensu lato"}
-                            </i> 
+                            </i>
                             {" genomes for epidemiological surveillance. "}
                             <i>
                                 {"bioRxiv"}
@@ -96,10 +94,10 @@ impl Model {
                             <a href="https://en.wikipedia.org/wiki/CC0">
                                 {"CC0 license "}
                             </a>
-                            {", which is as close to public domain as material can get. This means that you can do almost anything you want with the metadata. The "}                    
+                            {", which is as close to public domain as material can get. This means that you can do almost anything you want with the metadata. The "}
                             <a href="https://github.com/henriksson-lab/btyper_website/tree/main">
                                 {"code for the website"}
-                            </a>                    
+                            </a>
                             {" will be under a yet-to-be-decided open source license."}
                         </p>
                         <h1>{"The BTyperDB team"}</h1>
@@ -107,7 +105,7 @@ impl Model {
                             <a href="https://www.biorxiv.org/content/10.1101/2023.12.20.572685v1">
                                 {"BTyperDB is a community-driven project, with contributors and curators from around the world."}
                             </a>
-                            
+
                             {" The project is led by "}
                             <a href="https://www.microbe.dev/">{"Laura Carroll"}</a>
                             {" and "}
@@ -118,9 +116,6 @@ impl Model {
                 </div>
                 <br />
             </div>
-        }        
+        }
     }
-
-
-
 }

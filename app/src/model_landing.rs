@@ -2,7 +2,6 @@ use crate::core_model::*;
 
 use yew::prelude::*;
 
-
 ////////////////////////////////////////////////////////////
 /// If condition is met, return "selected", otherwise "". For OPTION
 pub fn selected_if(cond: bool) -> String {
@@ -11,17 +10,12 @@ pub fn selected_if(cond: bool) -> String {
     } else {
         "".to_string()
     }
-}   // can do true false https://yew.rs/docs/concepts/html 
-
-
+} // can do true false https://yew.rs/docs/concepts/html
 
 impl Model {
-
-
     ////////////////////////////////////////////////////////////
     /// x
     pub fn view_landing_page(&self, ctx: &Context<Self>) -> Html {
-
         let num_strain = if let Some(metadata) = &self.db_metadata {
             format!("{}", metadata.num_strain)
         } else {
@@ -33,7 +27,7 @@ impl Model {
             <div class="landingdiv">
                 <div class="commontext">
 
-                    <img src="assets/Btyperdb_logo.svg" alt="rust image"/> 
+                    <img src="assets/Btyperdb_logo.svg" alt="rust image"/>
                     <p style="color: rgb(0, 150, 255);">
                         {"A community curated, global atlas of Bacillus cereus group genomes"}
                     </p>
@@ -53,7 +47,4 @@ impl Model {
             </div>
         }
     }
-
-
-
 }

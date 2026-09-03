@@ -4,12 +4,9 @@ use my_web_app::TableData;
 use yew::prelude::*;
 
 impl Model {
-
-
     ////////////////////////////////////////////////////////////
     /// x
     pub fn get_strains(&self, inc: &IncludeData) -> Vec<String> {
-    
         //list_strains.push("BTDB_2022-0001042.1".to_string());
 
         let mut list_strains = Vec::new();
@@ -21,35 +18,42 @@ impl Model {
                         list_strains.push(id.clone());
                     }
                 }
-            },
+            }
             IncludeData::Selected => {
                 for e in &self.selected_strains {
                     list_strains.push(e.clone());
                 }
-            }                    
+            }
         }
         list_strains
     }
 
-
     ////////////////////////////////////////////////////////////
     /// Generate HTML for one row in the table
-    pub fn view_table_row(&self, ctx: &Context<Self>, dt: &TableData, row: &Vec<String>, show_cols: &Vec<usize>) -> Html {
-        let btyper_id = row.get(0).expect("Could not get first column of row to use as id");
+    pub fn view_table_row(
+        &self,
+        ctx: &Context<Self>,
+        dt: &TableData,
+        row: &Vec<String>,
+        show_cols: &Vec<usize>,
+    ) -> Html {
+        let btyper_id = row
+            .get(0)
+            .expect("Could not get first column of row to use as id");
 
-        let is_selected=self.selected_strains.contains(btyper_id);
+        let is_selected = self.selected_strains.contains(btyper_id);
 
-        let btyper_id_copy= btyper_id.clone();
-        let onclick: Callback<MouseEvent> = ctx.link().callback(move |_e | {
-            MsgCore::SetStrainSelected(btyper_id_copy.clone(), !is_selected)
-        });
+        let btyper_id_copy = btyper_id.clone();
+        let onclick: Callback<MouseEvent> = ctx
+            .link()
+            .callback(move |_e| MsgCore::SetStrainSelected(btyper_id_copy.clone(), !is_selected));
 
         let max_text_len = 40;
 
         html! {
             <tr key={btyper_id.clone()}>
                 <td>
-                    <input type="checkbox" key="check" onclick={onclick} checked={is_selected}/> 
+                    <input type="checkbox" key="check" onclick={onclick} checked={is_selected}/>
                 </td>
                 {
                     show_cols.iter().map(|i| {
@@ -70,7 +74,7 @@ impl Model {
                             None
                         };
 
-                        /////////// if having links, need to split by , 
+                        /////////// if having links, need to split by ,
 
 
                         //Shorten column text if needed
@@ -98,23 +102,19 @@ impl Model {
                     }).collect::<Html>()
                 }
             </tr>
-        }        
+        }
     }
-
 
     ////////////////////////////////////////////////////////////
     /// Generate HTML for the entire table
     pub fn view_table(&self, ctx: &Context<Self>) -> Html {
-
         if let AsyncData::Loading = &self.tabledata {
             html! {"Loading table..."}
         } else if let AsyncData::Loaded(dt) = &self.tabledata {
-
             //Check if table empty
-            if dt.rows.len()==0 {
+            if dt.rows.len() == 0 {
                 html! {"(Table is empty)"}
             } else {
-
                 //Figure out range of table rows to display
                 let entries_per_page = 100;
 
@@ -128,9 +128,8 @@ impl Model {
 
                 //log::debug!("showrows {:?}", show_rows);
                 //// Generate all pages
-                let possible_pages = 0..(1+(dt.rows.len()/entries_per_page));
-                let div_gotopage = if possible_pages.len()>1 { 
-
+                let possible_pages = 0..(1 + (dt.rows.len() / entries_per_page));
+                let div_gotopage = if possible_pages.len() > 1 {
                     html! {
                         <div>
                             <span class="commontext">
@@ -138,13 +137,13 @@ impl Model {
                             </span>
                             {
                                 possible_pages.into_iter().map(move |p| {
-                                    
+
                                     let onclick = ctx.link().callback(move |_e | {
                                         MsgCore::SetTableFrom(p*entries_per_page)
                                     });
 
-                                    html! { 
-                                        <label onclick={onclick}> 
+                                    html! {
+                                        <label onclick={onclick}>
                                             {format!("{} ",p+1)}   /////// possible to highlight current page here
                                         </label>
                                     }
@@ -152,14 +151,13 @@ impl Model {
                             }
                         </div>
                     }
-
                 } else {
-                    html!{ {""}}
+                    html! { {""}}
                 };
 
                 ///// Decide on columns to show
                 let mut show_cols = Vec::new();
-                for (i,colname) in dt.columns.iter().enumerate() {
+                for (i, colname) in dt.columns.iter().enumerate() {
                     if self.show_columns.contains(colname) {
                         //log::debug!("show col: {}",colname);
                         show_cols.push(i);
@@ -185,8 +183,8 @@ impl Model {
                                 //Generate HTML for column header
                                 let pretty_txt = str::replace(txt, "_", " ");
                                 html!{
-                                    <th key={*i} class="tableheader"> 
-                                        {pretty_txt} 
+                                    <th key={*i} class="tableheader">
+                                        {pretty_txt}
                                         <button onclick={remove_onclick} class="hidecolumnbutton">{"X"}</button>
                                     </th>
                                 }
@@ -204,20 +202,16 @@ impl Model {
                             { html_header }
                             ///// All rows in the table
                             {
-                                show_rows.into_iter().map(|i| { 
+                                show_rows.into_iter().map(|i| {
                                     html!{  self.view_table_row(&ctx, &dt, &dt.rows.get(i).expect("could not find row"), &show_cols)  }
                                 }).collect::<Html>()
                             }
                         </table>
-                    </div>        
-                } 
+                    </div>
+                }
             }
-           
         } else {
             html! {""}
-        }        
+        }
     }
-
-
-
 }
