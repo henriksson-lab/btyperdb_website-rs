@@ -1,0 +1,27 @@
+# Geo lookup overrides for the BTyperDB ingest.
+#
+# Every entry here was verified against the 14854-row btyperdb.tsv dump: the
+# vendored ISO 3166 tables reproduce 116/116 country codes and 493/494 region
+# codes on their own; these are the remaining gaps.
+#
+# kind      key1 (country name, or ISO alpha-2)   key2 (region name)   value
+#
+# --- country_alias: BTyperDB uses the ISO *short* name, the vendored table the long one
+country_alias	Congo, The Democratic Republic of the		COD
+country_alias	Netherlands		NLD
+country_alias	United Kingdom		GBR
+country_alias	United States		USA
+#
+# --- country_extra: not ISO 3166-1 at all; codes coined by BTyperDB curation
+country_extra	Atlantic Ocean		OAL
+country_extra	Indian Ocean		OIN
+country_extra	Pacific Ocean		OPC
+country_extra	International Space Station		SPS
+#
+# --- region_alias: BTyperDB drops the ISO bracketed alternate-language form
+region_alias	GB	Wales	GB-WLS
+#
+# --- region_ambiguous: two ISO 3166-2 entries share a name and neither has a
+#     parent, so the "prefer the top-level subdivision" rule cannot decide.
+#     UZ-TK = Toshkent (City), UZ-TO = Toshkent (Region); the data means the city.
+region_ambiguous	UZ	Toshkent	UZ-TK

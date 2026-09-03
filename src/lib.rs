@@ -1,6 +1,8 @@
 use serde::{de, Deserialize, Serialize, Serializer};
 use std::collections::BTreeMap;
 
+pub mod derive;
+
 type DatabaseHistogram = Vec<(String, i32)>;
 
 ////////////////////////////////////////////////////////////

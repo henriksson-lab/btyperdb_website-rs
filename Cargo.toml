@@ -12,5 +12,5 @@ csv = "1.2.2"
 phylo = "2.0.1"
 
 [workspace]
-members = ["server", "app"]
+members = ["server", "app", "ingest"]
 default-members = ["server"]

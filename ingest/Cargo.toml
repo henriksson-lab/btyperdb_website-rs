@@ -1,0 +1,12 @@
+[package]
+name = "ingest"
+version = "0.1.0"
+edition = "2018"
+
+# Builds meta/data.sqlite from meta/btyperdb.tsv, recomputing the derived
+# columns instead of trusting the ones in the TSV. Replaces the old tosqlite.py.
+
+[dependencies]
+my-web-app = {path=".."}
+csv = "1.2.2"
+rusqlite = "0.37.0"
