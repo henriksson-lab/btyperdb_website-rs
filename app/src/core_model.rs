@@ -297,7 +297,7 @@ impl Component for Model {
                 //Set columns to show
                 self.show_columns.clear();
                 for (colname, colmeta) in &data.columns {
-                    if colmeta.default_show_column == "1" {
+                    if colmeta.show_by_default {
                         self.show_columns.insert(colname.clone());
                     }
                 }

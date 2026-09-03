@@ -1,6 +1,8 @@
 use crate::{appstate::AsyncData, core_model::*};
 
 use my_web_app::TableData;
+use wasm_bindgen::JsCast;
+use web_sys::HtmlInputElement;
 use yew::prelude::*;
 
 impl Model {
@@ -43,10 +45,17 @@ impl Model {
 
         let is_selected = self.selected_strains.contains(btyper_id);
 
+        //Read the new state off the checkbox rather than negating the state
+        //captured when this row was rendered: SetStrainSelected does not
+        //re-render, so a captured value would stay stale and every click after
+        //the first would re-send the same thing -- the box cleared visually but
+        //the strain stayed selected.
         let btyper_id_copy = btyper_id.clone();
-        let onclick: Callback<MouseEvent> = ctx
-            .link()
-            .callback(move |_e| MsgCore::SetStrainSelected(btyper_id_copy.clone(), !is_selected));
+        let onclick: Callback<MouseEvent> = ctx.link().batch_callback(move |e: MouseEvent| {
+            e.target()
+                .and_then(|t| t.dyn_into::<HtmlInputElement>().ok())
+                .map(|input| MsgCore::SetStrainSelected(btyper_id_copy.clone(), input.checked()))
+        });
 
         let max_text_len = 40;
 

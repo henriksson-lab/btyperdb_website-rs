@@ -77,6 +77,26 @@ impl GeoMapView {
 
     ////////////////////////////////////////////////////////////
     /// Process top-level GeoJSON Object
+    ////////////////////////////////////////////////////////////
+    /// ISO 3166-1 alpha-3 code of one map feature.
+    ///
+    /// Natural Earth leaves "iso_a3" as the placeholder "-99" for a handful of
+    /// countries and puts the real code in "iso_a3_eh" instead. France and
+    /// Norway are both in that handful, so reading "iso_a3" alone silently
+    /// dropped them from the map -- France is the fourth largest country in
+    /// the database. Fall back to "iso_a3_eh", then to the Natural Earth admin
+    /// code "adm0_a3", and only then give up.
+    fn feature_iso_a3(map: &geojson::JsonObject) -> Option<&String> {
+        for key in ["iso_a3", "iso_a3_eh", "adm0_a3"] {
+            if let Some(serde_json::Value::String(s)) = map.get(key) {
+                if s != "-99" && !s.is_empty() {
+                    return Some(s);
+                }
+            }
+        }
+        None
+    }
+
     fn process_geojson(
         gj: &GeoJson,
         outpoly: &mut Vec<Html>,
@@ -89,11 +109,8 @@ impl GeoMapView {
                 for feature in &ctn.features {
                     let mut current_country = current_country;
                     if let Some(map) = &feature.properties {
-                        let iso_a3 = map.get("iso_a3");
-                        if let Some(f) = iso_a3 {
-                            if let serde_json::Value::String(s) = f {
-                                current_country = s;
-                            }
+                        if let Some(s) = Self::feature_iso_a3(map) {
+                            current_country = s;
                         }
                     }
                     if let Some(ref geom) = feature.geometry {

@@ -1,4 +1,4 @@
-use serde::{de, Deserialize, Serialize, Serializer};
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
 pub mod derive;
@@ -68,65 +68,61 @@ impl DatabaseMetadata {
 }
 
 ////////////////////////////////////////////////////////////
-/// Metadata about one column in the database
+/// How a column is searched. Anything else in the metadata file is a
+/// load-time error rather than a silent fallback to "matches nothing".
+#[derive(Debug, Serialize, Deserialize, Eq, PartialEq, Clone, Copy)]
+#[serde(rename_all = "lowercase")]
+pub enum ColumnType {
+    Text,
+    Float,
+    Integer,
+}
+
+impl ColumnType {
+    pub fn is_numeric(&self) -> bool {
+        matches!(self, ColumnType::Float | ColumnType::Integer)
+    }
+}
+
+////////////////////////////////////////////////////////////
+/// Metadata about one column in the database, as read from
+/// meta/btyperdb_include.json.
+///
+/// Every flag defaults to false and every string to empty, so the file only
+/// has to state what is true of a column. Unknown fields are ignored, which
+/// is what lets the file carry "notes" for whoever curates it without that
+/// text being shipped to every client on every request.
 #[derive(Debug, Serialize, Deserialize, Eq, PartialEq, Clone)]
 pub struct DatabaseColumn {
+    #[serde(rename = "id")]
     pub column_id: String,
-    pub column_type: String,
-    pub default_v1: String,
-    pub default_v2: String,
-    pub default_show_column: String,
 
-    #[serde(
-        deserialize_with = "deserialize_01bool",
-        serialize_with = "serialize_01bool"
-    )]
+    #[serde(rename = "type")]
+    pub column_type: ColumnType,
+
+    /// Value a new text filter starts with, or the lower bound of a new
+    /// range filter. Empty means no constraint.
+    #[serde(default)]
+    pub default_from: String,
+    /// Upper bound of a new range filter. Empty means no constraint.
+    #[serde(default)]
+    pub default_to: String,
+
+    /// Show this column in the table without the user asking
+    #[serde(default)]
+    pub show_by_default: bool,
+    /// Offer the distinct values of this column as an autocomplete list
+    #[serde(default)]
     pub dropdown: bool,
-    #[serde(
-        deserialize_with = "deserialize_01bool",
-        serialize_with = "serialize_01bool"
-    )]
+    /// May be shown as a column in the results table
+    #[serde(default)]
     pub display: bool,
-    #[serde(
-        deserialize_with = "deserialize_01bool",
-        serialize_with = "serialize_01bool"
-    )]
+    /// May be used as a search filter
+    #[serde(default)]
     pub search: bool,
-    #[serde(
-        deserialize_with = "deserialize_01bool",
-        serialize_with = "serialize_01bool"
-    )]
+    /// Included in the downloaded metadata file
+    #[serde(default)]
     pub print: bool,
-
-    pub notes: String,
-}
-
-////////////////////////////////////////////////////////////
-/// 1/0 => bool
-fn deserialize_01bool<'de, D>(deserializer: D) -> Result<bool, D::Error>
-where
-    D: de::Deserializer<'de>,
-{
-    let s: &str = de::Deserialize::deserialize(deserializer)?;
-
-    match s {
-        "1" => Ok(true),
-        "0" => Ok(false),
-        _ => Err(de::Error::unknown_variant(s, &["1", "0"])),
-    }
-}
-
-////////////////////////////////////////////////////////////
-/// bool => 1/0
-fn serialize_01bool<S>(x: &bool, s: S) -> Result<S::Ok, S::Error>
-where
-    S: Serializer,
-{
-    if *x {
-        s.serialize_str("1")
-    } else {
-        s.serialize_str("0")
-    }
 }
 
 ////////////////////////////////////////////////////////////
@@ -209,13 +205,10 @@ impl ComparisonType {
     ////////////////////////////////////////////////////////////
     /// Generate a comparison with default fields
     pub fn default_comparison(db: &DatabaseColumn) -> ComparisonType {
-        if db.column_type == "text" {
-            ComparisonType::Like(db.default_v1.clone())
-        } else if db.column_type == "float" || db.column_type == "integer" {
-            ComparisonType::FromTo(db.default_v1.clone(), db.default_v2.clone())
+        if db.column_type.is_numeric() {
+            ComparisonType::FromTo(db.default_from.clone(), db.default_to.clone())
         } else {
-            println!("!!!! unexpected type of data {}", db.column_type);
-            ComparisonType::Like("".to_string()) //TODO
+            ComparisonType::Like(db.default_from.clone())
         }
     }
 }

@@ -68,12 +68,16 @@ async fn main() -> std::io::Result<()> {
     let conn = Connection::open_with_flags(&path_sql, OpenFlags::SQLITE_OPEN_READ_ONLY)
         .expect("Could not open SQL database");
 
-    let path_meta = path_store.join(Path::new("meta/btyperdb_include.tsv"));
-    let f_meta = File::open(path_meta).expect("Could not open btyperdb_include");
-    let reader = BufReader::new(f_meta);
-    let db_metadata = read_database_metadata(reader, &conn).expect("Failed to read database meta");
-
     let column_storage = read_column_storage(&conn).expect("Failed to read column storage types");
+
+    let path_meta = path_store.join(Path::new("meta/btyperdb_include.json"));
+    let f_meta = File::open(&path_meta)
+        .unwrap_or_else(|e| panic!("Could not open {}: {}", path_meta.display(), e));
+    let reader = BufReader::new(f_meta);
+    let db_metadata = match read_database_metadata(reader, &conn, &column_storage) {
+        Ok(m) => m,
+        Err(e) => panic!("{}: {}", path_meta.display(), e),
+    };
 
     let data = Data::new(Mutex::new(ServerData {
         conn: conn,

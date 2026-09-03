@@ -14,31 +14,138 @@
 //! loaded by the `ingest` crate -- `GeoTable` is built there and passed in, so
 //! that the tables do not end up in the wasm bundle.
 
+use crate::{ColumnType, DatabaseColumn};
 use std::collections::HashMap;
 
 ////////////////////////////////////////////////////////////
-/// Columns that are derived, and thus ignored when read from the input file
-pub const DERIVED_COLUMNS: &[&str] = &[
-    "matchcol_BTyper3_species",
-    "matchcol_BTyper3_subspecies",
-    "matchcol_BTyper3_Pseudo_Gene_Flow_Unit",
-    "matchcol_BTyper3_Closest_Type_Strain",
-    "matchcol_BTyper3_anthrax_toxin",
-    "matchcol_BTyper3_emetic_toxin_cereulide",
-    "matchcol_BTyper3_diarrheal_toxin_Nhe",
-    "matchcol_BTyper3_diarrheal_toxin_Hbl",
-    "matchcol_BTyper3_diarrheal_toxin_CytK",
-    "matchcol_BTyper3_sphingomyelinase_Sph",
-    "matchcol_BTyper3_capsule_Cap",
-    "matchcol_BTyper3_capsule_Has",
-    "matchcol_BTyper3_capsule_Bps",
-    "matchcol_BTyper3_Bt",
-    "matchcol_BTyper3_PubMLST_ST",
-    "matchcol_BTyper3_Adjusted_panC_Group",
-    "Country(Code)",
-    "Region(Code)",
-    "Genome_Quality",
+/// A column whose value the ingest computes rather than reads.
+pub struct DerivedColumn {
+    pub name: &'static str,
+    pub column_type: ColumnType,
+    /// For the matchcol_* family, the display column this is the searchable
+    /// form of. None for columns that are user-facing in their own right.
+    pub matchcol_for: Option<&'static str>,
+}
+
+////////////////////////////////////////////////////////////
+/// Every column the ingest derives, and therefore ignores in the input file.
+///
+/// The matchcol_* entries also drive their own metadata -- see
+/// `matchcol_metadata` -- so adding one here is enough to make it searchable;
+/// it does not have to be repeated in btyperdb_include.json.
+pub const DERIVED_COLUMNS: &[DerivedColumn] = &[
+    m("matchcol_BTyper3_species", ColumnType::Text, "BTyper3_species(ANI)"),
+    m("matchcol_BTyper3_subspecies", ColumnType::Text, "BTyper3_subspecies(ANI)"),
+    m(
+        "matchcol_BTyper3_Pseudo_Gene_Flow_Unit",
+        ColumnType::Text,
+        "BTyper3_Pseudo_Gene_Flow_Unit(ANI)",
+    ),
+    m(
+        "matchcol_BTyper3_Closest_Type_Strain",
+        ColumnType::Text,
+        "BTyper3_Closest_Type_Strain(ANI)",
+    ),
+    m(
+        "matchcol_BTyper3_anthrax_toxin",
+        ColumnType::Integer,
+        "BTyper3_anthrax_toxin(genes)",
+    ),
+    m(
+        "matchcol_BTyper3_emetic_toxin_cereulide",
+        ColumnType::Integer,
+        "BTyper3_emetic_toxin_cereulide(genes)",
+    ),
+    m(
+        "matchcol_BTyper3_diarrheal_toxin_Nhe",
+        ColumnType::Integer,
+        "BTyper3_diarrheal_toxin_Nhe(genes)",
+    ),
+    m(
+        "matchcol_BTyper3_diarrheal_toxin_Hbl",
+        ColumnType::Integer,
+        "BTyper3_diarrheal_toxin_Hbl(genes)",
+    ),
+    m(
+        "matchcol_BTyper3_diarrheal_toxin_CytK",
+        ColumnType::Text,
+        "BTyper3_diarrheal_toxin_CytK(top_hit)",
+    ),
+    m(
+        "matchcol_BTyper3_sphingomyelinase_Sph",
+        ColumnType::Text,
+        "BTyper3_sphingomyelinase_Sph(gene)",
+    ),
+    m(
+        "matchcol_BTyper3_capsule_Cap",
+        ColumnType::Integer,
+        "BTyper3_capsule_Cap(genes)",
+    ),
+    m(
+        "matchcol_BTyper3_capsule_Has",
+        ColumnType::Integer,
+        "BTyper3_capsule_Has(genes)",
+    ),
+    m(
+        "matchcol_BTyper3_capsule_Bps",
+        ColumnType::Integer,
+        "BTyper3_capsule_Bps(genes)",
+    ),
+    m("matchcol_BTyper3_Bt", ColumnType::Text, "BTyper3_Bt(genes)"),
+    m(
+        "matchcol_BTyper3_PubMLST_ST",
+        ColumnType::Integer,
+        "BTyper3_PubMLST_ST[clonal_complex](perfect_matches)",
+    ),
+    m(
+        "matchcol_BTyper3_Adjusted_panC_Group",
+        ColumnType::Text,
+        "BTyper3_Adjusted_panC_Group(predicted_species)",
+    ),
+    // Computed, but ordinary columns as far as the user is concerned: whether
+    // they are shown, printed or offered as a dropdown is a curation choice
+    // that nothing about the derivation decides, so it stays in the metadata
+    // file with every other user-facing column.
+    d("Country(Code)", ColumnType::Text),
+    d("Region(Code)", ColumnType::Text),
+    d("Continent", ColumnType::Text),
+    d("Genome_Quality", ColumnType::Text),
 ];
+
+const fn m(name: &'static str, t: ColumnType, source: &'static str) -> DerivedColumn {
+    DerivedColumn { name, column_type: t, matchcol_for: Some(source) }
+}
+
+const fn d(name: &'static str, t: ColumnType) -> DerivedColumn {
+    DerivedColumn { name, column_type: t, matchcol_for: None }
+}
+
+////////////////////////////////////////////////////////////
+/// Metadata for the matchcol_* columns, which does not appear in
+/// btyperdb_include.json because none of it is a curation decision.
+///
+/// A matchcol exists for exactly one reason: to make a display column
+/// filterable. So it is searchable, it is never a table column or part of an
+/// export, and its type is whatever the derivation produces. Text ones get an
+/// autocomplete list; numeric ones are searched as a range, where the
+/// frontend never renders a list.
+pub fn matchcol_metadata() -> Vec<DatabaseColumn> {
+    DERIVED_COLUMNS
+        .iter()
+        .filter(|c| c.matchcol_for.is_some())
+        .map(|c| DatabaseColumn {
+            column_id: c.name.to_string(),
+            column_type: c.column_type,
+            default_from: String::new(),
+            default_to: String::new(),
+            show_by_default: false,
+            dropdown: c.column_type == ColumnType::Text,
+            display: false,
+            search: true,
+            print: false,
+        })
+        .collect()
+}
 
 /// Value used throughout BTyperDB for "we do not know"
 pub const UNKNOWN: &str = "Unknown";
@@ -258,6 +365,8 @@ pub struct GeoTable {
     country_to_alpha2: HashMap<String, String>,
     /// (alpha-2, subdivision name) => ISO 3166-2 code
     region_to_code: HashMap<(String, String), String>,
+    /// ISO 3166-1 alpha-3 => continent
+    alpha3_to_continent: HashMap<String, String>,
 }
 
 /// A country or region the ISO tables and the override file do not cover
@@ -267,6 +376,8 @@ pub enum GeoError {
     UnknownRegion(String, String),
     /// Country has no alpha-2, so its subdivisions cannot be looked up
     NoSubdivisions(String, String),
+    /// Country resolved to an alpha-3 that continents.tsv does not cover
+    UnknownContinent(String, String),
 }
 
 impl std::fmt::Display for GeoError {
@@ -285,6 +396,11 @@ impl std::fmt::Display for GeoError {
                 "country {:?} has no ISO alpha-2 code, so region {:?} cannot be resolved",
                 c, r
             ),
+            GeoError::UnknownContinent(c, a3) => write!(
+                f,
+                "country {:?} (alpha-3 {}) is not in continents.tsv",
+                c, a3
+            ),
         }
     }
 }
@@ -293,11 +409,22 @@ impl GeoTable {
     ////////////////////////////////////////////////////////////
     /// Build from the vendored tables. Each argument is the whole file.
     ///
-    /// `iso1`:      name, alpha2, alpha3
-    /// `iso2`:      code, name, parent
-    /// `overrides`: kind, key1, key2, value  (see geo_overrides.tsv)
-    pub fn new(iso1: &str, iso2: &str, overrides: &str) -> Result<GeoTable, String> {
+    /// `iso1`:       name, alpha2, alpha3
+    /// `iso2`:       code, name, parent
+    /// `overrides`:  kind, key1, key2, value  (see geo_overrides.tsv)
+    /// `continents`: alpha3, continent, name
+    pub fn new(
+        iso1: &str,
+        iso2: &str,
+        overrides: &str,
+        continents: &str,
+    ) -> Result<GeoTable, String> {
         let mut t = GeoTable::default();
+
+        for (_n, f) in rows(continents, 3, "continents.tsv")? {
+            t.alpha3_to_continent
+                .insert(f[0].to_string(), f[1].to_string());
+        }
 
         for (n, f) in rows(iso1, 3, "iso_3166-1.tsv")? {
             let _ = n;
@@ -413,6 +540,29 @@ impl GeoTable {
             .get(&(alpha2.clone(), region.to_string()))
             .cloned()
             .ok_or_else(|| GeoError::UnknownRegion(country.to_string(), region.to_string()))
+    }
+
+    ////////////////////////////////////////////////////////////
+    /// Continent a country sits on, e.g. "France" => "Europe".
+    ///
+    /// "Unknown" stays "Unknown" -- and note that is not the same as saying the
+    /// continent is unknown. A handful of genomes record a place that is not a
+    /// modern country ("Czechoslovakia", "Soviet Union", "Korea"), so the
+    /// curator left Country as Unknown but still knew the continent. That fact
+    /// lives only in the Continent column, so the ingest keeps the curated
+    /// value in exactly that case rather than overwriting it.
+    pub fn continent(&self, country: &str) -> Result<String, GeoError> {
+        if country == UNKNOWN {
+            return Ok(UNKNOWN.to_string());
+        }
+        let alpha3 = self
+            .country_to_alpha3
+            .get(country)
+            .ok_or_else(|| GeoError::UnknownCountry(country.to_string()))?;
+        self.alpha3_to_continent
+            .get(alpha3)
+            .cloned()
+            .ok_or_else(|| GeoError::UnknownContinent(country.to_string(), alpha3.clone()))
     }
 }
 
@@ -565,8 +715,32 @@ mod tests {
              country_extra\tPacific Ocean\t\tOPC\n\
              region_alias\tGB\tWales\tGB-WLS\n\
              region_ambiguous\tUZ\tToshkent\tUZ-TK\n",
+            "alpha3\tcontinent\tname\n\
+             IND\tAsia\tIndia\n\
+             ESP\tEurope\tSpain\n\
+             UZB\tAsia\tUzbekistan\n\
+             GBR\tEurope\tUnited Kingdom\n\
+             OPC\tOcean\tPacific Ocean\n",
         )
         .unwrap()
+    }
+
+    #[test]
+    fn continents() {
+        let g = geo();
+        assert_eq!(g.continent("India").unwrap(), "Asia");
+        assert_eq!(g.continent("Spain").unwrap(), "Europe");
+        // resolved through a country_alias
+        assert_eq!(g.continent("United Kingdom").unwrap(), "Europe");
+        // a coined non-ISO country still gets a continent
+        assert_eq!(g.continent("Pacific Ocean").unwrap(), "Ocean");
+        // Unknown country means the lookup has nothing to say; the ingest
+        // keeps whatever the curator recorded in that case
+        assert_eq!(g.continent("Unknown").unwrap(), "Unknown");
+        assert_eq!(
+            g.continent("Atlantis"),
+            Err(GeoError::UnknownCountry("Atlantis".to_string()))
+        );
     }
 
     #[test]

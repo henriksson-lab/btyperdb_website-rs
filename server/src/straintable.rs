@@ -78,8 +78,6 @@ fn build_straindb_search(
     let mut params = Vec::new();
 
     if search.criteria.len() > 0 {
-        query.push_str(" WHERE ");
-
         let mut list_formatted_crit: Vec<String> = Vec::new();
         for crit in search.criteria.iter() {
             let col = metadata.columns.get(&crit.field).ok_or_else(|| {
@@ -89,8 +87,16 @@ fn build_straindb_search(
 
             match &crit.comparison {
                 ComparisonType::FromTo(from, to) => {
-                    let from = parse_search_number(from, &crit.field)?;
-                    let to = parse_search_number(to, &crit.field)?;
+                    // An empty box means "no bound", not "match nothing". Most
+                    // numeric columns ship with empty defaults, so a criterion
+                    // the user has added but not filled in has to be inert
+                    // rather than an error -- otherwise merely selecting such a
+                    // column and pressing Search returns a 400.
+                    let from = parse_optional_search_number(from, &crit.field)?;
+                    let to = parse_optional_search_number(to, &crit.field)?;
+                    if from.is_none() && to.is_none() {
+                        continue;
+                    }
 
                     // A column the metadata calls numeric is not necessarily
                     // stored numerically. Collection_Year and
@@ -117,19 +123,32 @@ fn build_straindb_search(
                         colname.clone()
                     };
 
-                    list_formatted_crit.push(format!("{} >= ?", expr));
-                    params.push(Value::Real(from));
-                    list_formatted_crit.push(format!("{} <= ?", expr));
-                    params.push(Value::Real(to));
+                    if let Some(from) = from {
+                        list_formatted_crit.push(format!("{} >= ?", expr));
+                        params.push(Value::Real(from));
+                    }
+                    if let Some(to) = to {
+                        list_formatted_crit.push(format!("{} <= ?", expr));
+                        params.push(Value::Real(to));
+                    }
                 }
                 ComparisonType::Like(v) => {
+                    // Likewise: a blank text box is no constraint. Left as-is
+                    // it became "col LIKE ''", which matches nothing at all.
+                    if v.trim().is_empty() {
+                        continue;
+                    }
                     list_formatted_crit.push(format!("{} LIKE ?", colname));
                     params.push(Value::Text(v.clone()));
                 }
             };
         }
-        //println!("{:?}",query);
-        query.push_str(list_formatted_crit.join(" AND ").as_str());
+        //Every criterion may have been left blank, in which case there is no
+        //WHERE clause at all -- emitting a bare "WHERE" would be a syntax error
+        if !list_formatted_crit.is_empty() {
+            query.push_str(" WHERE ");
+            query.push_str(list_formatted_crit.join(" AND ").as_str());
+        }
     }
     query.push_str(" limit 100000");
 
@@ -139,6 +158,15 @@ fn build_straindb_search(
 
 fn sql_quote_identifier(s: &str) -> String {
     format!("\"{}\"", s.replace('"', "\"\""))
+}
+
+/// A range bound the user may have left blank. Blank means unbounded.
+fn parse_optional_search_number(s: &str, field: &str) -> Result<Option<f64>, QueryError> {
+    if s.trim().is_empty() {
+        Ok(None)
+    } else {
+        parse_search_number(s.trim(), field).map(Some)
+    }
 }
 
 fn parse_search_number(s: &str, field: &str) -> Result<f64, QueryError> {
@@ -169,8 +197,43 @@ pub fn read_column_storage(conn: &Connection) -> SqlResult<BTreeMap<String, Stri
 }
 
 ////////////////////////////////////////////////////////////
+/// Shape of meta/btyperdb_include.json
+#[derive(Debug, serde::Deserialize)]
+struct ColumnFile {
+    columns: Vec<DatabaseColumn>,
+}
+
+////////////////////////////////////////////////////////////
+/// Why the column metadata could not be loaded. Startup fails on any of
+/// these, naming the offending column, rather than panicking with a backtrace.
+#[derive(Debug)]
+pub enum MetadataError {
+    Parse(String),
+    Database(rusqlite::Error),
+}
+
+impl std::fmt::Display for MetadataError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            MetadataError::Parse(m) => write!(f, "{}", m),
+            MetadataError::Database(e) => write!(f, "database error: {}", e),
+        }
+    }
+}
+
+impl From<rusqlite::Error> for MetadataError {
+    fn from(e: rusqlite::Error) -> Self {
+        MetadataError::Database(e)
+    }
+}
+
+////////////////////////////////////////////////////////////
 /// Get metadata about the database
-pub fn read_database_metadata(src: impl Read, conn: &Connection) -> SqlResult<DatabaseMetadata> {
+pub fn read_database_metadata(
+    src: impl Read,
+    conn: &Connection,
+    storage: &BTreeMap<String, String>,
+) -> Result<DatabaseMetadata, MetadataError> {
     let mut list_dropdown = BTreeMap::new();
     let mut list_hist = Vec::new();
 
@@ -207,23 +270,38 @@ pub fn read_database_metadata(src: impl Read, conn: &Connection) -> SqlResult<Da
 
     let hist_country = query_histogram(&conn, &"Country(Code)".to_string())?;
 
-    let num_strain = query_get_strain_count(&conn).expect("Could not get SQL strain count");
+    let num_strain = query_get_strain_count(&conn)?;
 
-    /////////// Other metadata from CSV-file
+    /////////// Column metadata from btyperdb_include.json
+    let file: ColumnFile = serde_json::from_reader(src)
+        .map_err(|e| MetadataError::Parse(format!("could not read column metadata: {}", e)))?;
+
+    //The matchcol_* columns describe themselves -- see derive::matchcol_metadata
     let mut outlist = BTreeMap::new();
-    let mut reader = csv::ReaderBuilder::new().delimiter(b'\t').from_reader(src);
-    for result in reader.deserialize() {
-        let record: DatabaseColumn = result.unwrap();
-
-        /////////// Drop-down values for relevant fields  --- detect from metadata file?
-        if record.dropdown {
-            list_dropdown.insert(
-                record.column_id.clone(),
-                query_dropdown(conn, &record.column_id).expect("Failed to create dropdown"),
-            );
+    for record in file.columns.into_iter().chain(my_web_app::derive::matchcol_metadata()) {
+        /////////// A column named in the metadata but absent from the database
+        /////////// would otherwise turn into a string literal in every query
+        /////////// that used it (sqlite's double-quote fallback), silently
+        /////////// matching everything or nothing.
+        if !storage.contains_key(&record.column_id) {
+            return Err(MetadataError::Parse(format!(
+                "column {:?} is in the metadata but not in the straindata table",
+                record.column_id
+            )));
         }
 
-        outlist.insert(record.column_id.clone(), record);
+        /////////// Distinct values, for the autocomplete lists
+        if record.dropdown {
+            let values = query_dropdown(conn, &record.column_id)?;
+            list_dropdown.insert(record.column_id.clone(), values);
+        }
+
+        if let Some(dup) = outlist.insert(record.column_id.clone(), record) {
+            return Err(MetadataError::Parse(format!(
+                "column {:?} appears twice in the metadata",
+                dup.column_id
+            )));
+        }
     }
 
     //    println!("{:?}",list_dropdown);

@@ -27,6 +27,7 @@ use rusqlite::{types::Value, Connection};
 const ISO_3166_1: &str = include_str!("../data/iso_3166-1.tsv");
 const ISO_3166_2: &str = include_str!("../data/iso_3166-2.tsv");
 const GEO_OVERRIDES: &str = include_str!("../data/geo_overrides.tsv");
+const CONTINENTS: &str = include_str!("../data/continents.tsv");
 
 /// Values that mean "no value" in the TSV, and become SQL NULL.
 /// Matches what pandas.read_csv did in tosqlite.py for the columns that
@@ -125,7 +126,7 @@ fn run(dir: &Path, force: bool, replace: bool) -> Result<(), String> {
         ));
     }
 
-    let geo = GeoTable::new(ISO_3166_1, ISO_3166_2, GEO_OVERRIDES)?;
+    let geo = GeoTable::new(ISO_3166_1, ISO_3166_2, GEO_OVERRIDES, CONTINENTS)?;
 
     ////////// Read the whole TSV. It is ~15 MB, so this is not worth streaming.
     println!("reading {}", path_tsv.display());
@@ -157,9 +158,10 @@ fn run(dir: &Path, force: bool, replace: bool) -> Result<(), String> {
 
     ////////// Every column we are about to compute must be present, both so
     ////////// that the schema keeps its shape and so that we can verify.
-    let missing: Vec<&&str> = DERIVED_COLUMNS
+    let missing: Vec<&str> = DERIVED_COLUMNS
         .iter()
-        .filter(|c| !index.contains_key(**c))
+        .map(|c| c.name)
+        .filter(|c| !index.contains_key(*c))
         .collect();
     if !missing.is_empty() {
         return Err(format!(
@@ -286,6 +288,23 @@ fn run(dir: &Path, force: bool, replace: bool) -> Result<(), String> {
             }
         }
 
+        //////////// Continent follows from the country -- except that a
+        //////////// genome whose recorded place is not a modern country
+        //////////// ("Czechoslovakia", "Soviet Union", "Korea") has
+        //////////// Country = Unknown while the curator still knew the
+        //////////// continent. That fact exists nowhere else, so it is kept.
+        match geo.continent(&country) {
+            Ok(v) => {
+                let curated = src("Continent")?;
+                let keep_curated = v == derive::UNKNOWN && curated != derive::UNKNOWN;
+                computed.push(("Continent", if keep_curated { curated } else { v }));
+            }
+            Err(e) => {
+                geo_errors.push(format!("line {}: {}", line, e));
+                computed.push(("Continent", src("Continent")?));
+            }
+        }
+
         for (col, value) in computed {
             row[index[col]] = value;
         }
@@ -320,8 +339,8 @@ fn run(dir: &Path, force: bool, replace: bool) -> Result<(), String> {
     let mut diffs: BTreeMap<&str, (usize, Vec<String>)> = BTreeMap::new();
     for (n, rec) in original.records().enumerate() {
         let rec = rec.map_err(|e| format!("line {}: {}", n + 2, e))?;
-        for col in DERIVED_COLUMNS {
-            let i = index[*col];
+        for col in DERIVED_COLUMNS.iter().map(|c| c.name) {
+            let i = index[col];
             let (was, now) = (&rec[i], rows[n][i].as_str());
             if was != now {
                 let e = diffs.entry(col).or_insert((0, Vec::new()));
