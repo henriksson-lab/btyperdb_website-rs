@@ -1,0 +1,13 @@
+# Build output
+/target
+/dist
+app/dist
+
+# Local deployment config. The config.json.* templates are tracked; the live
+# config.json points at whichever store this machine serves and is not.
+/config.json
+
+# Editor / OS noise
+*.rs.bk
+*.swp
+.DS_Store
