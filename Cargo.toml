@@ -14,3 +14,10 @@ phylo = "2.0.1"
 [workspace]
 members = ["server", "app", "ingest"]
 default-members = ["server"]
+
+# `make build` ships the release profile to users: the server binary and, more
+# importantly, the wasm bundle every visitor downloads. Cross-crate LTO and a
+# single codegen unit cut that bundle substantially at the cost of build time.
+[profile.release]
+lto = true
+codegen-units = 1

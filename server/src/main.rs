@@ -4,6 +4,7 @@ pub mod straintable;
 pub mod tree;
 pub mod zip;
 
+use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::{Path, PathBuf};
@@ -26,6 +27,10 @@ use zip::*;
 pub struct ServerData {
     conn: Connection,
     db_metadata: DatabaseMetadata,
+    /// Storage type of each column, from the sqlite schema. Range searches
+    /// need it: the metadata file's "integer"/"float" says how a column should
+    /// be searched, not how it is stored.
+    column_storage: BTreeMap<String, String>,
     path_store: PathBuf,
     tree: TreeData,
 }
@@ -68,9 +73,12 @@ async fn main() -> std::io::Result<()> {
     let reader = BufReader::new(f_meta);
     let db_metadata = read_database_metadata(reader, &conn).expect("Failed to read database meta");
 
+    let column_storage = read_column_storage(&conn).expect("Failed to read column storage types");
+
     let data = Data::new(Mutex::new(ServerData {
         conn: conn,
         db_metadata: db_metadata,
+        column_storage: column_storage,
         tree: tree,
         path_store: path_store.into(),
     }));

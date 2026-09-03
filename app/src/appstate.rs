@@ -9,12 +9,22 @@ pub enum AsyncData<T> {
     NotLoaded,
     Loading,
     Loaded(Arc<T>),
+    /// The request finished but did not produce usable data: the server
+    /// answered with an error status, was unreachable, or sent a body we
+    /// could not parse. Holds a message fit to show the user.
+    Failed(Arc<String>),
 }
 impl<T> AsyncData<T> {
     ////////////////////////////////////////////////////////////
     /// Wrap data as loaded AsyncData
     pub fn new(data: T) -> AsyncData<T> {
         AsyncData::Loaded(Arc::new(data))
+    }
+
+    ////////////////////////////////////////////////////////////
+    /// Wrap an error message as failed AsyncData
+    pub fn failed(msg: impl Into<String>) -> AsyncData<T> {
+        AsyncData::Failed(Arc::new(msg.into()))
     }
 }
 
@@ -27,6 +37,7 @@ impl<T> Clone for AsyncData<T> {
             AsyncData::Loaded(this) => AsyncData::Loaded(this.clone()),
             AsyncData::NotLoaded => AsyncData::NotLoaded,
             AsyncData::Loading => AsyncData::Loading,
+            AsyncData::Failed(msg) => AsyncData::Failed(msg.clone()),
         }
     }
 }
@@ -47,6 +58,10 @@ impl<T> PartialEq for AsyncData<T> {
             },
             AsyncData::Loading => match other {
                 AsyncData::Loading => true,
+                _ => false,
+            },
+            AsyncData::Failed(this) => match other {
+                AsyncData::Failed(other) => this == other,
                 _ => false,
             },
         }

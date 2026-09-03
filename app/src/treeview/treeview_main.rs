@@ -160,6 +160,9 @@ impl Component for TreeView {
             AsyncData::Loading => {
                 html! {<p>{"Tree is loading. This can take a few seconds on Chrome"}</p>}
             }
+            AsyncData::Failed(msg) => {
+                html! {<p class="errormessage">{"The tree could not be loaded. "}{msg}</p>}
+            }
             AsyncData::Loaded(_treedata) => {
                 html! {
                     <canvas

@@ -110,6 +110,16 @@ impl Model {
     pub fn view_table(&self, ctx: &Context<Self>) -> Html {
         if let AsyncData::Loading = &self.tabledata {
             html! {"Loading table..."}
+        } else if let AsyncData::Failed(msg) = &self.tabledata {
+            //The search could not be run. Say why, and leave the search
+            //controls alone so the user can correct it and try again.
+            html! {
+                <div class="errormessage">
+                    <b>{"The search could not be completed."}</b>
+                    <br/>
+                    {msg}
+                </div>
+            }
         } else if let AsyncData::Loaded(dt) = &self.tabledata {
             //Check if table empty
             if dt.rows.len() == 0 {

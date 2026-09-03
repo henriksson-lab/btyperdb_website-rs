@@ -20,6 +20,40 @@ use crate::resize::ComponentSizeObserver;
 use crate::treeview::treelayout::TreeLayout;
 
 ////////////////////////////////////////////////////////////
+/// Send a request and read the response as json, describing any failure
+/// instead of panicking on it.
+///
+/// The backend answers an invalid search with a plain-text 400 body, so
+/// calling .json() on whatever came back used to take down the whole app --
+/// clearing a numeric search box was enough to do it. Errors reach the user as
+/// an AsyncData::Failed message now.
+async fn fetch_json<T: serde::de::DeserializeOwned>(
+    req: reqwest::RequestBuilder,
+    what: &str,
+) -> Result<T, String> {
+    let res = req
+        .send()
+        .await
+        .map_err(|e| format!("Could not reach the server while loading {what}. ({e})"))?;
+
+    let status = res.status();
+    if !status.is_success() {
+        // An error response carries a plain-text explanation, not json
+        let body = res.text().await.unwrap_or_default();
+        let body = body.trim();
+        return if body.is_empty() {
+            Err(format!("The server rejected the request for {what} ({status})."))
+        } else {
+            Err(format!("The server rejected the request for {what}: {body}"))
+        };
+    }
+
+    res.json::<T>()
+        .await
+        .map_err(|e| format!("Could not read the {what} sent back by the server. ({e})"))
+}
+
+////////////////////////////////////////////////////////////
 /// Which page is currently being shown?
 #[derive(Debug, PartialEq)]
 pub enum CurrentPage {
@@ -53,10 +87,10 @@ pub enum MsgCore {
     DeleteSearchFilter(usize),
 
     FetchDatabaseMetadata,
-    SetDatabaseMetadata(DatabaseMetadata),
+    SetDatabaseMetadata(Result<DatabaseMetadata, String>),
 
     FetchTreeData,
-    SetTreeData(TreeLayout),
+    SetTreeData(AsyncData<TreeLayout>),
 
     ChangedSearchFieldType(usize, String),
     ChangedSearchFieldFrom(usize, String),
@@ -86,6 +120,9 @@ pub struct Model {
     pub show_search_controls: bool,
     pub search_settings: SearchSettings,
     pub db_metadata: Option<DatabaseMetadata>,
+    /// Set when /strainmeta could not be loaded. Nothing else works without
+    /// it, so the message is shown in place of the page content.
+    pub metadata_error: Option<String>,
 
     pub geojson: GeoJson,
 
@@ -122,6 +159,7 @@ impl Component for Model {
             show_search_controls: true,
             search_settings: SearchSettings::new(),
             db_metadata: None,
+            metadata_error: None,
             geojson: geojson,
 
             selected_strains: HashSet::new(),
@@ -169,17 +207,14 @@ impl Component for Model {
                 //log::debug!("sending {}", json);
                 async fn get_data(json: String) -> MsgCore {
                     let client = reqwest::Client::new();
-                    let res: TableData = client
+                    let req = client
                         .post(format!("{}/straindata", get_host_url()))
                         .header("Content-Type", "application/json")
-                        .body(json)
-                        .send()
-                        .await
-                        .expect("Failed to send request")
-                        .json()
-                        .await
-                        .expect("Failed to get table data");
-                    MsgCore::SetQuery(AsyncData::new(res))
+                        .body(json);
+                    match fetch_json::<TableData>(req, "the search results").await {
+                        Ok(res) => MsgCore::SetQuery(AsyncData::new(res)),
+                        Err(msg) => MsgCore::SetQuery(AsyncData::failed(msg)),
+                    }
                 }
 
                 ctx.link().send_future(get_data(json));
@@ -192,19 +227,10 @@ impl Component for Model {
                 async fn get_data() -> MsgCore {
                     let client = reqwest::Client::new();
                     let url = format!("{}/strainmeta", get_host_url());
-                    //log::debug!("wtf -{}-",url);
-                    let res: DatabaseMetadata = client
-                        .get(url)
-                        .header("Content-Type", "application/json")
-                        .body("")
-                        //no body
-                        .send()
-                        .await
-                        .expect("Failed to send request")
-                        .json()
-                        .await
-                        .expect("Failed to get metadata");
-                    MsgCore::SetDatabaseMetadata(res)
+                    let req = client.get(url).header("Content-Type", "application/json");
+                    MsgCore::SetDatabaseMetadata(
+                        fetch_json::<DatabaseMetadata>(req, "the database description").await,
+                    )
                 }
 
                 ctx.link().send_future(get_data());
@@ -217,35 +243,28 @@ impl Component for Model {
                 async fn get_data() -> MsgCore {
                     let client = reqwest::Client::new();
                     let url = format!("{}/treedata", get_host_url());
-                    //log::debug!("wtf -{}-",url);
                     log::debug!("getting tree");
-                    let res: TreeData = client
-                        .get(url)
-                        .header("Content-Type", "application/json")
-                        .body("")
-                        //no body
-                        .send()
-                        .await
-                        .expect("Failed to send request")
-                        .json()
-                        .await
-                        .expect("Failed to get treedata");
-                    log::debug!("making layout");
-                    let lay = TreeLayout::new(&res.tree_str);
-                    log::debug!("setting layout");
-                    MsgCore::SetTreeData(lay)
+                    let req = client.get(url).header("Content-Type", "application/json");
+                    match fetch_json::<TreeData>(req, "the phylogenetic tree").await {
+                        Ok(res) => {
+                            log::debug!("making layout");
+                            MsgCore::SetTreeData(AsyncData::new(TreeLayout::new(&res.tree_str)))
+                        }
+                        Err(msg) => MsgCore::SetTreeData(AsyncData::failed(msg)),
+                    }
                 }
 
+                //Mark as in-flight before starting, or every re-render that
+                //happens while the tree downloads starts another download
+                self.treedata = AsyncData::Loading;
                 ctx.link().send_future(get_data());
-                false
+                true
             }
 
             ////////////////////////////////////////////////////////////
             // x
             MsgCore::SetTreeData(lay) => {
-                //log::trace!("SetDatabaseMetadata: {:?}", data);
-                //let lay = TreeLayout::new(&data.tree_str);
-                self.treedata = AsyncData::new(lay);
+                self.treedata = lay;
 
                 true
             }
@@ -263,6 +282,18 @@ impl Component for Model {
             ////////////////////////////////////////////////////////////
             // x
             MsgCore::SetDatabaseMetadata(data) => {
+                let data = match data {
+                    Ok(data) => data,
+                    Err(msg) => {
+                        //Without the metadata there is no search UI to show, so
+                        //this one has to be visible on the page itself
+                        log::error!("{}", msg);
+                        self.metadata_error = Some(msg);
+                        return true;
+                    }
+                };
+                self.metadata_error = None;
+
                 //Set columns to show
                 self.show_columns.clear();
                 for (colname, colmeta) in &data.columns {
@@ -392,7 +423,11 @@ impl Component for Model {
             // x
             MsgCore::DownloadFASTAgot(data) => {
                 log::debug!("DownloadFASTAgot");
-                self.download_fasta(&data);
+                if data.is_empty() {
+                    alert("The sequences could not be downloaded. Please try again, or with fewer strains selected.");
+                } else {
+                    self.download_fasta(&data);
+                }
                 false
             }
 
@@ -420,13 +455,30 @@ impl Component for Model {
                             .header("Content-Type", "application/json")
                             .body(json)
                             .send()
-                            .await
-                            .expect("Failed to send request")
-                            .bytes()
-                            .await
-                            .expect("Failed to get table data");
+                            .await;
 
-                        MsgCore::DownloadFASTAgot(res.to_vec())
+                        //An empty Vec means "it did not work"; the handler
+                        //below turns that into an alert rather than saving a
+                        //zero-byte zip
+                        let bytes = match res {
+                            Err(e) => {
+                                log::error!("fasta download failed: {}", e);
+                                Vec::new()
+                            }
+                            Ok(res) if !res.status().is_success() => {
+                                log::error!("fasta download rejected: {}", res.status());
+                                Vec::new()
+                            }
+                            Ok(res) => match res.bytes().await {
+                                Ok(b) => b.to_vec(),
+                                Err(e) => {
+                                    log::error!("fasta download truncated: {}", e);
+                                    Vec::new()
+                                }
+                            },
+                        };
+
+                        MsgCore::DownloadFASTAgot(bytes)
                     }
                     ctx.link().send_future(get_data(json));
                 }
@@ -541,9 +593,25 @@ impl Component for Model {
             </div>
         };
 
+        //Nothing on any page works without the database description, so if it
+        //failed to load, say so above whatever the page managed to render
+        let html_metadata_error = match &self.metadata_error {
+            Some(msg) => html! {
+                <div class="errormessage">
+                    <b>{"The database could not be contacted."}</b>
+                    <br/>
+                    {msg}
+                    <br/>
+                    {"Reloading the page will try again."}
+                </div>
+            },
+            None => html! {},
+        };
+
         html! {
             <div>
                 { html_top_buttons }
+                { html_metadata_error }
                 { current_page }
             </div>
         }

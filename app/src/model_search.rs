@@ -95,10 +95,12 @@ impl Model {
             }
         };
 
-        //Figure out which fields we can search
+        //Figure out which fields we can search. Note this is the "search" flag
+        //from btyperdb_include.tsv, not "display": the two overlap but are not
+        //the same set, and it is "search" that says a column can be filtered on.
         let mut list_select_options = Vec::new();
         for (colname, colmeta) in &metadata.columns {
-            if colmeta.display {
+            if colmeta.search {
                 list_select_options.push(html! {
                     <option value={colname.clone()} selected={*colname == crit.field}>
                         { colname.replace("_", " ") }

@@ -72,6 +72,7 @@ struct QueryPlan {
 fn build_straindb_search(
     search: &SearchSettings,
     metadata: &DatabaseMetadata,
+    storage: &BTreeMap<String, String>,
 ) -> Result<QueryPlan, QueryError> {
     let mut query = "SELECT * FROM straindata ".to_string();
     let mut params = Vec::new();
@@ -90,9 +91,35 @@ fn build_straindb_search(
                 ComparisonType::FromTo(from, to) => {
                     let from = parse_search_number(from, &crit.field)?;
                     let to = parse_search_number(to, &crit.field)?;
-                    list_formatted_crit.push(format!("{} >= ?", colname));
+
+                    // A column the metadata calls numeric is not necessarily
+                    // stored numerically. Collection_Year and
+                    // matchcol_BTyper3_PubMLST_ST hold sentinels ("Unknown",
+                    // "[1990,1996]") next to the numbers, so sqlite gives the
+                    // column TEXT affinity and compares the bound value as a
+                    // string: "2000" sorts before "2000.0", and a 2000..2010
+                    // search silently dropped every genome collected in 2000.
+                    //
+                    // Compare those as numbers. The GLOB guard is what keeps
+                    // the sentinels out: they CAST to 0.0, so without it a
+                    // range containing zero would match every "Unknown" row.
+                    let is_text = storage
+                        .get(&col.column_id)
+                        .map(|t| t.eq_ignore_ascii_case("text"))
+                        .unwrap_or(false);
+                    let expr = if is_text {
+                        list_formatted_crit.push(format!(
+                            "({c} GLOB '[0-9]*' OR {c} GLOB '-[0-9]*')",
+                            c = colname
+                        ));
+                        format!("CAST({} AS REAL)", colname)
+                    } else {
+                        colname.clone()
+                    };
+
+                    list_formatted_crit.push(format!("{} >= ?", expr));
                     params.push(Value::Real(from));
-                    list_formatted_crit.push(format!("{} <= ?", colname));
+                    list_formatted_crit.push(format!("{} <= ?", expr));
                     params.push(Value::Real(to));
                 }
                 ComparisonType::Like(v) => {
@@ -125,6 +152,20 @@ fn parse_search_number(s: &str, field: &str) -> Result<f64, QueryError> {
             "invalid numeric value for {field}: {s}"
         )))
     }
+}
+
+////////////////////////////////////////////////////////////
+/// Declared storage type of every column, straight from the sqlite schema.
+///
+/// The metadata file says how a column should be *searched*; this says how it
+/// is actually *stored*. They disagree for the columns that mix numbers with
+/// sentinel strings, and a range search has to know which it is dealing with.
+pub fn read_column_storage(conn: &Connection) -> SqlResult<BTreeMap<String, String>> {
+    let mut stmt = conn.prepare("SELECT name, type FROM pragma_table_info('straindata')")?;
+    let rows = stmt.query_map([], |row| {
+        Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+    })?;
+    rows.collect()
 }
 
 ////////////////////////////////////////////////////////////
@@ -205,7 +246,11 @@ fn query_straintable(
     //println!("Query database using: {}",q);
 
     let server_data = server_data.lock().unwrap();
-    let query_plan = build_straindb_search(&search, &server_data.db_metadata)?;
+    let query_plan = build_straindb_search(
+        &search,
+        &server_data.db_metadata,
+        &server_data.column_storage,
+    )?;
 
     let mut stmt = server_data.conn.prepare(query_plan.sql.as_str())?;
 
